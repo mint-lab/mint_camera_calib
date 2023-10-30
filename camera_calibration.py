@@ -175,7 +175,6 @@ def find_chessboard_conners(images, board_pattern):
             img_points.append(corners)
     assert len(img_points) > 0  
 
-    # Calibrate the camera
     return img_points, gray.shape
 
 
@@ -204,8 +203,6 @@ if __name__ == '__main__':
     obj_3d = ObjPoints(chessboard_pattern)   
     obj_points= obj_3d.initilize_ojb_points(len(img_points))
 
-
-    # TRAIN
     focal_length = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
     distortion = ['k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_p1_p2_k3', 'no']
     data_split_types = [1, 2, 3, 4, 5]
@@ -220,8 +217,11 @@ if __name__ == '__main__':
         for f in focal_length:
             result = []
             for dist in distortion:
+                # Create a flag for calibration
                 cali_flag = CalbrationFlag()
                 flags_calibrate = cali_flag.make_cali_flag(focal_length=f, distortion=dist)
+
+                # TRAIN
                 rms_train, K_train, dist_train, rvecs_train, tvecs_train = calibrate(obj_points_train, img_points_train, 
                                                                                     img_size, flag_cali=flags_calibrate)
                 # TEST
