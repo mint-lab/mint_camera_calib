@@ -11,6 +11,8 @@ class ObjPoints:
     def initilize_ojb_points(self, len_img_points):
         obj_pts = [[c, r, 0] for r in range(self.board_pattern[1]) for c in range(self.board_pattern[0])]
         obj_points = [np.array(obj_pts, dtype=np.float32)] * len_img_points # Must be 'np.float32'
+        row, col = obj_points[0].shape
+        obj_points = [x.reshape(row, 1, col) for x in obj_points]
         return obj_points
 
 
