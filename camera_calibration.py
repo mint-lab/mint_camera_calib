@@ -177,6 +177,19 @@ class CalibrationFlag:
             else:
                 return self.focal_length[cam_type][focal_length] + self.distortion[cam_type][distortion]
 
+
+class CameraModel:
+    def __init__(self):
+        self.focal_length            = {}
+        self.focal_length['normal']  = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
+        self.focal_length['fisheye'] = ['fx_fy', 'fx_fy_s', 'fx_fy_cx_cy', 'fx_fy_cx_cy_s']
+    
+
+        self.distortion              = {}
+        self.distortion['normal']    = ['k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_p1_p2_k3', 'no']
+        self.distortion['fisheye']   = ['k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_k3_k4', 'no']
+
+
 def load_img(input_path):
     img_select = []
     files = glob.glob(input_path + '*.png')
@@ -221,8 +234,24 @@ def cal_error(obj_points, img_points, rvecs, tvecs, K, dist, cam_type='normal'):
 
     return mean_error / len(obj_points)
 
+
+def train_test_process(obj_points_train, img_points_train, obj_points_test, img_points_test, img_size, f, dist, cam_type='normal'):
+    # Create a flag for calibration
+    cali_flag = CalibrationFlag()
+    flags_calibrate = cali_flag.make_cali_flag(focal_length=f, distortion=dist, cam_type=cam_type)
+
+    # TRAIN
+    rms_train, K_train, dist_train, rvecs_train, tvecs_train = calibrate(obj_points_train, img_points_train, 
+                                                                        img_size, flag_cali=flags_calibrate, cam_type=cam_type)
+    # TEST
+    train_error = cal_error(obj_points_train, img_points_train, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type) 
+    test_error = cal_error(obj_points_test, img_points_test, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type)
+
+    return train_error, test_error
+
+
 if __name__ == '__main__':
-    input_file = 'data/image_60/'
+    input_file = 'data/image/'
     chessboard_pattern = (10, 7)
 
     images = load_img(input_file)
@@ -231,7 +260,6 @@ if __name__ == '__main__':
     # Create object points data
     obj_3d = ObjPoints(chessboard_pattern)   
     obj_points= obj_3d.initilize_ojb_points(len(img_points))
-    print(obj_points[0])
     
     cam_types = ['fisheye', 'normal']
     data_split_types = [1, 2, 3, 4, 5]
@@ -258,7 +286,7 @@ if __name__ == '__main__':
             df = pd.DataFrame(results, index= focal_lengths, columns=distortions)
             frame.append(df)
 
-        with pd.ExcelWriter(cam_type + '_results_60.xlsx') as writer:
+        with pd.ExcelWriter(cam_type + '_results.xlsx') as writer:
             df = pd.concat(frame, axis=0)
             df.to_excel(writer, sheet_name='all')
             for ind, df in enumerate(frame):
