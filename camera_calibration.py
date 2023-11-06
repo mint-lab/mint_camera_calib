@@ -222,14 +222,20 @@ def calibrate(train_obj_points, train_img_points, img_size, cam_type='normal', K
         return cv.calibrateCamera(train_obj_points, train_img_points, img_size[::-1], cameraMatrix=K, distCoeffs=dist, flags=flag_cali)
 
 
+def find_reproject_points(obj_points, rvecs, tvecs, K, dist, cam_type='normal'):
+    if cam_type == 'fisheye':
+        reproj_img_points, _ = cv.fisheye.projectPoints(obj_points, rvecs, tvecs, K, dist)
+    else:
+        reproj_img_points, _ = cv.projectPoints(obj_points, rvecs, tvecs, K, dist)
+
+    return reproj_img_points
+
+
 def cal_error(obj_points, img_points, rvecs, tvecs, K, dist, cam_type='normal'):
     mean_error = 0
     for i in range(len(obj_points)):
-        if cam_type == 'fisheye':
-            reproj_img_points, _ = cv.fisheye.projectPoints(obj_points[i], rvecs[i], tvecs[i], K, dist)
-        else:
-            reproj_img_points, _ = cv.projectPoints(obj_points[i], rvecs[i], tvecs[i], K, dist)
-        error = cv.norm(img_points[i], reproj_img_points, cv.NORM_L2) / len(reproj_img_points)
+        reproj_img_points = find_reproject_points(obj_points[i], rvecs[i], tvecs[i], K, dist, cam_type)
+        error = cv.norm(img_points[i], reproj_img_points, cv.NORM_L2) / np.sqrt(len(reproj_img_points))
         mean_error += error
 
     return mean_error / len(obj_points)
