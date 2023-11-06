@@ -157,25 +157,30 @@ class CalibrationFlag:
         self.distortion['fisheye']['no']           = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
 
     def make_cali_flag(self, focal_length, distortion, cam_type='normal'):
+        fisheye_calib_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+        normal_calib_flag = None
+
+        focal_length_dict = self.focal_length[cam_type]
+        distortion_dict = self.distortion[cam_type]
 
         if cam_type == 'fisheye':
             if distortion == 'k1_k2_k3_k4' and focal_length == 'fx_fy_cx_cy_s':
-                return None
+                return fisheye_calib_flag
             elif focal_length == 'fx_fy_cx_cy_s':
-                return self.distortion[cam_type][distortion]
-            elif distortion == 'k1_k2_k3_k4': 
-                return self.focal_length[cam_type][focal_length]
+                return fisheye_calib_flag + distortion_dict[distortion]
+            elif distortion == 'k1_k2_k3_k4':
+                return fisheye_calib_flag + focal_length_dict[focal_length]
             else:
-                return self.focal_length[cam_type][focal_length] + self.distortion[cam_type][distortion]
-        else:   
+                return fisheye_calib_flag + focal_length_dict[focal_length] + distortion_dict[distortion]
+        else:
             if distortion == 'k1_k2_p1_p2_k3' and focal_length == 'fx_fy_cx_cy':
-                return None
+                return normal_calib_flag
             elif focal_length == 'fx_fy_cx_cy':
-                return self.distortion[cam_type][distortion]
-            elif distortion == 'k1_k2_p1_p2_k3': 
-                return self.focal_length[cam_type][focal_length]
+                return distortion_dict[distortion]
+            elif distortion == 'k1_k2_p1_p2_k3':
+                return focal_length_dict[focal_length]
             else:
-                return self.focal_length[cam_type][focal_length] + self.distortion[cam_type][distortion]
+                return focal_length_dict[focal_length] + distortion_dict[distortion]
 
 
 class CameraModel:
