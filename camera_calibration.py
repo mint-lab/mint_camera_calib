@@ -2,13 +2,16 @@ import numpy as np
 import cv2 as cv
 import glob
 import pandas as pd
+from tqdm import tqdm
+import os
+import random
 
 
 class ObjPoints:
     def __init__(self, board_pattern):
         self.board_pattern = board_pattern
 
-    def initilize_ojb_points(self, len_img_points):
+    def initilize_obj_points(self, len_img_points):
         obj_pts = [[c, r, 0] for r in range(self.board_pattern[1]) for c in range(self.board_pattern[0])]
         obj_points = [np.array(obj_pts, dtype=np.float32)] * len_img_points # Must be 'np.float32'
         row, col = obj_points[0].shape
@@ -16,116 +19,62 @@ class ObjPoints:
         return obj_points
 
 
-class MakeTrainTestData:
+class DataSampling:
     def __init__(self, obj_pts, img_pts, board_pattern):
         self.obj_pts = obj_pts
         self.img_pts = img_pts
         self.board_pattern = board_pattern
 
-    def split_data(self, split_type):
+    def split_data(self, sampling_type, test_size=0.3):
         selected_slice_train, selected_slice_test = [], []
         
-        if split_type == 1:
-            selected_slice_train, selected_slice_test = self.split_type_1()
-        elif split_type == 2:
-            selected_slice_train, selected_slice_test = self.split_type_2()
-        elif split_type == 3:
-            selected_slice_train, selected_slice_test = self.split_type_3()
-        elif split_type == 4:
-            selected_slice_train, selected_slice_test = self.split_type_4()
-        elif split_type == 5:
-            selected_slice_train, selected_slice_test = self.split_type_5()
+        if sampling_type == 'random':
+            selected_slice_train, selected_slice_test = self.random_sampling(test_size)
+        else:
+            selected_slice_train, selected_slice_test = self.structure_sampling(sampling_type)
 
-        obj_points_train = [i[np.ix_(selected_slice_train)] for i in self.obj_pts]
-        img_points_train = [i[np.ix_(selected_slice_train)] for i in self.img_pts]
-        obj_points_test = [i[np.ix_(selected_slice_test)] for i in self.obj_pts]
-        img_points_test = [i[np.ix_(selected_slice_test)] for i in self.img_pts]
+        obj_points_train = [i[selected_slice_train] for i in self.obj_pts]
+        img_points_train = [i[selected_slice_train] for i in self.img_pts]
+        obj_points_test = [i[selected_slice_test] for i in self.obj_pts]
+        img_points_test = [i[selected_slice_test] for i in self.img_pts]
 
         return obj_points_train, img_points_train, obj_points_test, img_points_test
 
-    def split_type_1(self):
-        '''
-        ***************************
-        ---------------------------
-        ---------------------------
-        ---------------------------
-        ***************************
-        '''
-        selected_slice_train, selected_slice_test = [], []
+    def structure_sampling(self, sampling_type):
+        points_in_length = []
         for i in range(self.board_pattern[1]):
             for j in range(self.board_pattern[0]):
                 if i == 0 or i == self.board_pattern[1] - 1:
-                    selected_slice_test.append(i * self.board_pattern[0] + j)
-                else:
-                    selected_slice_train.append(i * self.board_pattern[0] + j)
-        return selected_slice_train, selected_slice_test
+                    points_in_length.append(i * self.board_pattern[0] + j)
 
-    def split_type_2(self):
-        '''
-        *-------------------------*
-        *-------------------------*
-        *-------------------------*
-        *-------------------------*
-        *-------------------------*
-        '''
-        selected_slice_train, selected_slice_test = [], []
+        points_in_breadth = []
         for i in range(self.board_pattern[0] * self.board_pattern[1]):
             if i % self.board_pattern[0] == 0 or (i + 1) % self.board_pattern[0] == 0:
-                selected_slice_test.append(i)
-            else:
-                selected_slice_train.append(i)
+                points_in_breadth.append(i)
+
+        all_points = list(range(self.board_pattern[0] * self.board_pattern[1]))
+        if sampling_type == 'extrapolar':
+            selected_slice_test = list(set(points_in_length + points_in_breadth))
+            selected_slice_train = [i for i in all_points if i not in selected_slice_test]  
+        elif sampling_type == 'interpolar':
+            selected_slice_train = list(set(points_in_length + points_in_breadth))
+            selected_slice_test = [i for i in all_points if i not in selected_slice_train]
+
         return selected_slice_train, selected_slice_test
 
-    def split_type_3(self):
-        '''
-        *-*-*-*-*-*-*-*-*-*-*-*-*
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        *-*-*-*-*-*-*-*-*-*-*-*-*
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        *-*-*-*-*-*-*-*-*-*-*-*-*
-        '''
-        selected_slice_train, selected_slice_test = [], []
-        for i in range(self.board_pattern[0] * self.board_pattern[1]):
-            if i % 2 == 0:
-                selected_slice_train.append(i)
-            else:
-                selected_slice_test.append(i)
+    def random_sampling(self, test_size):
+        all_points = list(range(self.board_pattern[0] * self.board_pattern[1]))
+
+        # Calculate the number of points to select (30% of the list size)
+        num_points_to_select = int(test_size * len(all_points))
+
+        # Randomly select 30% of elements
+        random.seed(1000)
+        selected_slice_test = sorted(random.sample(all_points, num_points_to_select))
+        selected_slice_train = [i for i in all_points if i not in selected_slice_test]
+
         return selected_slice_train, selected_slice_test
-    
-    def split_type_4(self):
-        '''
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        -*-*-*-*-*-*-*-*-*-*-*-*-
-        '''
-        selected_slice_train, selected_slice_test = [], []
-        for i in range(self.board_pattern[1]):
-            for j in range(self.board_pattern[0]):
-                if j % 2 == 0:
-                    selected_slice_train.append(i * self.board_pattern[0] + j)
-                else:
-                    selected_slice_test.append(i * self.board_pattern[0] + j)
-        return selected_slice_train, selected_slice_test
-    
-    def split_type_5(self):
-        '''
-        ---------------------------
-        ***************************
-        ---------------------------
-        ***************************
-        ---------------------------
-        '''
-        selected_slice_train, selected_slice_test = [], []
-        for i in range(self.board_pattern[1]):
-            for j in range(self.board_pattern[0]):
-                if i % 2 == 0:
-                    selected_slice_train.append(i * self.board_pattern[0] + j)
-                else:
-                    selected_slice_test.append(i * self.board_pattern[0] + j)
-        return selected_slice_train, selected_slice_test
-    
+
 
 class CalibrationFlag:
     def __init__(self):
@@ -183,7 +132,7 @@ class CalibrationFlag:
                 return focal_length_dict[focal_length] + distortion_dict[distortion]
 
 
-class CameraModel:
+class CameraModelCombination:
     def __init__(self):
         self.focal_length            = {}
         self.focal_length['normal']  = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
@@ -191,20 +140,17 @@ class CameraModel:
     
 
         self.distortion              = {}
-        self.distortion['normal']    = ['k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_p1_p2_k3', 'no']
-        self.distortion['fisheye']   = ['k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_k3_k4', 'no']
+        self.distortion['normal']    = ['no', 'k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_p1_p2_k3']
+        self.distortion['fisheye']   = ['no', 'k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_k3_k4']
 
 
 def load_img(input_path):
-    img_select = []
     files = glob.glob(input_path + '*.png')
-    for file in files:
-        img = cv.imread(file)
-        img_select.append(img)
+    img_select = [cv.imread(file) for file in files]
     return img_select
 
 
-def find_chessboard_conners(images, board_pattern):
+def find_chessboard_corners(images, board_pattern):
 
     # Find 2D corner points from given images
     img_points = []
@@ -212,10 +158,10 @@ def find_chessboard_conners(images, board_pattern):
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         complete, pts = cv.findChessboardCorners(gray, board_pattern)
         if complete:
-            criteria = cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001
+            criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
             corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
             img_points.append(corners)
-    assert len(img_points) > 0  
+    assert len(img_points) > 0
 
     return img_points, gray.shape
 
@@ -255,50 +201,55 @@ def train_test_process(obj_points_train, img_points_train, obj_points_test, img_
     rms_train, K_train, dist_train, rvecs_train, tvecs_train = calibrate(obj_points_train, img_points_train, 
                                                                         img_size, flag_cali=flags_calibrate, cam_type=cam_type)
     # TEST
-    train_error = cal_error(obj_points_train, img_points_train, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type) 
+    train_error = cal_error(obj_points_train, img_points_train, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type)
     test_error = cal_error(obj_points_test, img_points_test, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type)
 
     return train_error, test_error
 
 
 if __name__ == '__main__':
-    input_file = 'data/image/'
-    chessboard_pattern = (10, 7)
+    num_data = 64
+    input_file = 'data/image_' + str(num_data) + '/'
+    result_path = 'results/'
+    if not os.path.isdir(result_path):
+        os.mkdir(result_path)
 
+    chessboard_pattern = (10, 7)
     images = load_img(input_file)
-    img_points, img_size = find_chessboard_conners(images, chessboard_pattern)
+    img_points, img_size = find_chessboard_corners(images, chessboard_pattern)
   
     # Create object points data
-    obj_3d = ObjPoints(chessboard_pattern)   
-    obj_points= obj_3d.initilize_ojb_points(len(img_points))
-    
-    cam_types = ['fisheye', 'normal']
-    data_split_types = [1, 2, 3, 4, 5]
-    cam_model = CameraModel()
+    obj_3d = ObjPoints(chessboard_pattern)
+    obj_points= obj_3d.initilize_obj_points(len(img_points))
 
-    for cam_type in cam_types:
+    cam_types = ['normal', 'fisheye']
+    data_sampling_types = ['extrapolar', 'interpolar', 'random']
+    cam_model = CameraModelCombination()
+
+    combination_results = []
+    for cam_type in tqdm(cam_types):
         frame = []
         focal_lengths = cam_model.focal_length[cam_type]
-        distortions =cam_model.distortion[cam_type]
-        for data_split_type in data_split_types:
+        distortions = cam_model.distortion[cam_type]
+        for data_sampling_type in data_sampling_types:
             # Split data into train and test data
-            data = MakeTrainTestData(obj_points, img_points, chessboard_pattern)
-            obj_points_train, img_points_train, obj_points_test, img_points_test = data.split_data(split_type=data_split_type)
+            data_maker = DataSampling(obj_points, img_points, chessboard_pattern)
+            obj_points_train, img_points_train, obj_points_test, img_points_test = data_maker.split_data(sampling_type=data_sampling_type)
 
             results = []
             for f in focal_lengths:
                 result = []
                 for dist in distortions:
                     train_error, test_error = train_test_process(obj_points_train, img_points_train, obj_points_test, img_points_test, img_size, f, dist, cam_type)
-                    result.append({'train': round(train_error, 3), 'test': round(test_error, 3)})
+                    result.append({'train': f"{round(train_error, 2):.2f}", 'test': f"{round(test_error, 2):.2f}"})
                 results.append(result)   
-            
-        
+
             df = pd.DataFrame(results, index= focal_lengths, columns=distortions)
             frame.append(df)
+        combination_results.append(frame)
 
-        with pd.ExcelWriter(cam_type + '_results.xlsx') as writer:
-            df = pd.concat(frame, axis=0)
-            df.to_excel(writer, sheet_name='all')
-            for ind, df in enumerate(frame):
-                df.to_excel(writer, sheet_name= 'data_type = ' + str(ind + 1), index=False)
+    with pd.ExcelWriter(result_path + 'results_' + str(num_data) + '.xlsx') as writer:
+        for df_ind, df in enumerate(combination_results):
+            df = pd.concat(df, axis=0)
+            df.to_excel(writer, sheet_name='all', startcol=df_ind * (df.shape[1] + 1))
+            df.to_excel(writer, sheet_name= cam_types[df_ind], index=False)
