@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 import os
 import random
-
+from pprint import pprint
 
 class ObjPoints:
     def __init__(self, board_pattern):
@@ -207,8 +207,24 @@ def train_test_process(obj_points_train, img_points_train, obj_points_test, img_
     return train_error, test_error
 
 
+def caculate_model_score(train_error, test_error, f, dist):
+    test_error_weight = 1
+    train_error_weight = 1
+    train_test_weight = 0.05
+    num_parameter_weight = 0.05
+
+    if dist == 'no':
+        num_para = len(f.split('_'))
+    else:
+        num_para = len(f.split('_')) + len(dist.split('_'))
+
+    train_test_ratio = test_error / train_error
+
+    return test_error_weight * test_error + train_error_weight * train_error + train_test_weight * train_test_ratio + num_parameter_weight * num_para
+
+
 if __name__ == '__main__':
-    num_data = 64
+    num_data = 1
     input_file = 'data/image_' + str(num_data) + '/'
     result_path = 'results/'
     if not os.path.isdir(result_path):
@@ -226,6 +242,8 @@ if __name__ == '__main__':
     data_sampling_types = ['extrapolar', 'interpolar', 'random']
     cam_model = CameraModelCombination()
 
+    best_combination = {}
+    model_best_score = 100
     combination_results = []
     for cam_type in tqdm(cam_types):
         frame = []
@@ -241,13 +259,23 @@ if __name__ == '__main__':
                 result = []
                 for dist in distortions:
                     train_error, test_error = train_test_process(obj_points_train, img_points_train, obj_points_test, img_points_test, img_size, f, dist, cam_type)
+                    model_score = caculate_model_score(train_error, test_error, f, dist)
+                    if model_score < model_best_score:
+                        model_best_score = model_score
+                        best_combination['cam_type'] = cam_type
+                        best_combination['focal_lengths'] = f
+                        best_combination['distortions'] = dist
+                        best_combination['train_error'] = train_error
+                        best_combination['test_error'] = test_error
+                        best_combination['model_best_score'] = model_best_score
                     result.append({'train': f"{round(train_error, 2):.2f}", 'test': f"{round(test_error, 2):.2f}"})
                 results.append(result)   
 
             df = pd.DataFrame(results, index= focal_lengths, columns=distortions)
             frame.append(df)
         combination_results.append(frame)
-
+    pprint(best_combination)
+               
     with pd.ExcelWriter(result_path + 'results_' + str(num_data) + '.xlsx') as writer:
         for df_ind, df in enumerate(combination_results):
             df = pd.concat(df, axis=0)
