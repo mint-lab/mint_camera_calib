@@ -29,9 +29,9 @@ def generate_cam_dist_coeff(dist, cam_type='normal'):
             cam_dist_coeff[i] = round(random.uniform(random_range[0], random_range[1]), 2) 
     return cam_dist_coeff
 
-def conv_3param2K(intrinsic, image_resolution, cam_type='normal'):
+def conv_3param2K(f, image_resolution, cam_type='normal'):
     if cam_type == 'normal':
-        splitted_intrinsic = intrinsic.split('_')
+        splitted_intrinsic = f.split('_')
         if len(splitted_intrinsic) == 1:
             cam_fx = cam_fy = random.randint(500, 1000)
             cx = image_resolution[0] / 2
@@ -52,7 +52,7 @@ def conv_3param2K(intrinsic, image_resolution, cam_type='normal'):
             cy = random.randint(0, image_resolution[1])
         K = np.array([[cam_fx, 0., cx], [0., cam_fy, cy], [0., 0., 1.]])
     else: 
-        splitted_intrinsic = intrinsic.split('_')
+        splitted_intrinsic = f.split('_')
         if len(splitted_intrinsic) == 2:
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
@@ -92,44 +92,36 @@ if __name__ == '__main__':
     # # Project 3D points
     chessboard_pattern = (10, 7)
     X = gen_chessboard_points(chessboard_pattern)
-    save_path = 'synthetic_data/obj_points_synthetic.pkl'
-    with open(save_path, 'wb') as f:
-        pickle.dump(X, f)
+    
+    # K = conv_3param2K(f, image_resolution, cam_type=cam_type)
+    # print('K = ', K)
+    # rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
+    # cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
+    # x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+    # with open('synthetic_data/img_points_synthetic.pkl', 'wb') as f:
+    #     pickle.dump(x, f)
+    
     
 
     cam_model = CameraModelCombination()
-    cam_type = 'normal'
-    f = 'fx_fy_cx_cy'
-    dist = 'no'
-    
-    K = conv_3param2K(f, image_resolution, cam_type=cam_type)
-    print('K = ', K)
-    rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
-    cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
-    x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
-    with open('synthetic_data/img_points_synthetic.pkl', 'wb') as f:
-        pickle.dump(x, f)
-    
-    
+    cam_types = ['normal', 'fisheye']
+    ind_data = 1
+    for cam_type in cam_types:
+        focal_lengths = cam_model.focal_length[cam_type]
+        distortions = cam_model.distortion[cam_type]
+        for f in focal_lengths:
+            for dist in distortions:
+                K = conv_3param2K(f, image_resolution, cam_type=cam_type)
+                rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
+                cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
+                x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+                mean, standard_deviation = 0, 0.1
+                noise = np.random.normal(mean, standard_deviation, x.shape)
+                x_noise = x + noise
 
-    # cam_model = CameraModelCombination()
-    # cam_types = ['normal', 'fisheye']
-    # for cam_type in cam_types:
-    #     focal_lengths = cam_model.focal_length[cam_type]
-    #     distortions = cam_model.distortion[cam_type]
-    #     for f in focal_lengths:
-    #         for dist in distortions:
-    #             K = conv_3param2K(f, image_resolution, cam_type=cam_type)
-    #             print('K', K)
-    #             rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
-    #             cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
-    #             x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
-    #             with open('synthetic_data/img_points_synthetic.pkl', 'wb') as f:
-    #                 pickle.dump(x, f)
-    #             break
-    #         break
-    #     break
-
+                with open('data_synthetic/img_points_synthetic' + str(ind_data) + '.pkl', 'wb') as f:
+                    pickle.dump(x_noise, f)
+                ind_data += 1
     # Calibrate the camera using OpenCV
     # rms, cv_K, cv_dist_coeff, cv_rvec, cv_tvec = cv.calibrateCamera([X], [x], (cam_w, cam_h), None, None, flags=cv.CALIB_ZERO_TANGENT_DIST)
 
