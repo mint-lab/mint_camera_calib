@@ -31,47 +31,46 @@ def generate_cam_dist_coeff(dist, cam_type='normal'):
 
 def conv_3param2K(f, image_resolution, cam_type='normal'):
     if cam_type == 'normal':
-        splitted_intrinsic = f.split('_')
-        if len(splitted_intrinsic) == 1:
+      
+        if f == 'f':
             cam_fx = cam_fy = random.randint(500, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
-        if len(splitted_intrinsic) == 2:
+        if f == 'fx_fy':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
-        if len(splitted_intrinsic) == 3:
+        if f == 'f_cx_cy':
             cam_fx = cam_fy = random.randint(500, 1000)
             cx = random.randint(0, image_resolution[0])
             cy = random.randint(0, image_resolution[1])
-        if len(splitted_intrinsic) == 4:
+        if f == 'fx_fy_cx_cy':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = random.randint(0, image_resolution[0])
             cy = random.randint(0, image_resolution[1])
         K = np.array([[cam_fx, 0., cx], [0., cam_fy, cy], [0., 0., 1.]])
     else: 
-        splitted_intrinsic = f.split('_')
-        if len(splitted_intrinsic) == 2:
+        if f == 'fx_fy':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
             s = 0
-        if len(splitted_intrinsic) == 3:
+        if f == 'fx_fy_s':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
             s = round(random.uniform(0, 0.09), 2)
-        if len(splitted_intrinsic) == 4:
+        if f == 'fx_fy_cx_cy':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = random.randint(0, image_resolution[0])
             cy = random.randint(0, image_resolution[1])
             s = 0
-        if len(splitted_intrinsic) == 5:
+        if f == 'fx_fy_cx_cy_s':
             cam_fx =random.randint(500, 1000)
             cam_fy = random.randint(500, 1000)
             cx = random.randint(0, image_resolution[0])
@@ -104,7 +103,7 @@ if __name__ == '__main__':
     
 
     cam_model = CameraModelCombination()
-    cam_types = ['normal', 'fisheye']
+    cam_types = ['normal']
     ind_data = 1
     for cam_type in cam_types:
         focal_lengths = cam_model.focal_length[cam_type]
@@ -115,13 +114,15 @@ if __name__ == '__main__':
                 rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
                 cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
                 x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
-                mean, standard_deviation = 0, 0.1
+                mean, standard_deviation = 0, 0.01
                 noise = np.random.normal(mean, standard_deviation, x.shape)
                 x_noise = x + noise
+                X = np.float32(X)
+                x_noise = np.float32(np.round(x_noise, decimals = 4))
 
-                with open('data_synthetic/img_points_synthetic' + str(ind_data) + '.pkl', 'wb') as f:
-                    pickle.dump(x_noise, f)
+                np.save('data_synthetic/synthetic_img_pt' + str(ind_data) + '.npy', x_noise) 
                 ind_data += 1
+                
     # Calibrate the camera using OpenCV
     # rms, cv_K, cv_dist_coeff, cv_rvec, cv_tvec = cv.calibrateCamera([X], [x], (cam_w, cam_h), None, None, flags=cv.CALIB_ZERO_TANGENT_DIST)
 
