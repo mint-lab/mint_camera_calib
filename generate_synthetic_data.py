@@ -99,6 +99,8 @@ if __name__ == '__main__':
     index = []
     file_paths = []
     camera_model = []
+    distortion = []
+    intrinsic = []
     for cam_type in cam_types:
         focal_lengths = cam_model.focal_length[cam_type]
         distortions = cam_model.distortion[cam_type]
@@ -115,10 +117,12 @@ if __name__ == '__main__':
                 x_noise = np.float32(np.round(x_noise, decimals = 4))
                 file_name = 'data_synthetic/synthetic_img_pt' + str(ind_data) + '.npy'
                 np.save(file_name, x_noise) 
-                ind_data += 1
                 index.append(ind_data)
                 file_paths.append(file_name)
                 camera_model.append({'type' :cam_type, 'f': f, 'dist': dist})
+                intrinsic.append(K.flatten())
+                distortion.append(cam_dist_coeff)
+                ind_data += 1
 
-    df = pd.DataFrame({'ind' :index, 'file_path': file_paths, "cam_model": camera_model})
+    df = pd.DataFrame({'ind' :index, 'file_path': file_paths, 'intrinsic': intrinsic, 'distortion': distortion,  "cam_model": camera_model})
     df.to_excel('data_synthetic/synthetic.xlsx', index=False)
