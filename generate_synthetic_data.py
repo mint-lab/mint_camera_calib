@@ -94,7 +94,7 @@ if __name__ == '__main__':
     X = gen_chessboard_points(chessboard_pattern)
     
     cam_model = CameraModelCombination()
-    cam_types = ['normal']
+    cam_types = ['normal', 'fisheye']
     ind_data = 1
     index = []
     file_paths = []
@@ -110,6 +110,10 @@ if __name__ == '__main__':
                 rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
                 cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
                 x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+                if cam_type == 'fisheye':
+                    x, _ = cv.fisheye.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+                else:
+                    x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
                 mean, standard_deviation = 0, 0.01
                 noise = np.random.normal(mean, standard_deviation, x.shape)
                 x_noise = x + noise
