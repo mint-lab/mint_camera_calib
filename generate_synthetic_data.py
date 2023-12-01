@@ -7,6 +7,12 @@ from camera_calibration import CameraModelCombination
 import pickle
 import pandas as pd
 
+def random_principal_point():
+    cx = random.randint(image_resolution[0] / 2 - 10, image_resolution[0] / 2 + 10)
+    cy = random.randint(image_resolution[1] / 2 + 10, image_resolution[1] / 2 + 10)
+
+    return cx, cy   
+
 def gen_chessboard_points(chessboard_pattern, cellsize=0.025, dtype=np.float32):
     '''Generate 3D points with regular interval on a plane (a.k.a. chessboard).'''
     obj_pts = cellsize * np.array([(c, r, 0) for r in range(chessboard_pattern[1]) for c in range(chessboard_pattern[0])], dtype=dtype)
@@ -31,51 +37,46 @@ def generate_cam_dist_coeff(dist, cam_type='normal'):
     return cam_dist_coeff
 
 def conv_3param2K(f, image_resolution, cam_type='normal'):
-    if cam_type == 'normal':
-      
+    if cam_type == 'normal':  
         if f == 'f':
-            cam_fx = cam_fy = random.randint(500, 1000)
+            cam_fx = cam_fy = random.randint(800, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
         if f == 'fx_fy':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
+            cam_fx =random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
         if f == 'f_cx_cy':
-            cam_fx = cam_fy = random.randint(500, 1000)
-            cx = random.randint(0, image_resolution[0])
-            cy = random.randint(0, image_resolution[1])
+            cam_fx = cam_fy = random.randint(800, 1000)
+            cx, cy = random_principal_point()
         if f == 'fx_fy_cx_cy':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
-            cx = random.randint(0, image_resolution[0])
-            cy = random.randint(0, image_resolution[1])
+            cam_fx = random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
+            cx, cy = random_principal_point()
         K = np.array([[cam_fx, 0., cx], [0., cam_fy, cy], [0., 0., 1.]])
     else: 
         if f == 'fx_fy':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
+            cam_fx =random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
             s = 0
         if f == 'fx_fy_s':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
+            cam_fx =random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
             cx = image_resolution[0] / 2
             cy = image_resolution[1] / 2
             s = round(random.uniform(0, 0.09), 2)
         if f == 'fx_fy_cx_cy':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
-            cx = random.randint(0, image_resolution[0])
-            cy = random.randint(0, image_resolution[1])
+            cam_fx =random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
+            cx, cy = random_principal_point()
             s = 0
         if f == 'fx_fy_cx_cy_s':
-            cam_fx =random.randint(500, 1000)
-            cam_fy = random.randint(500, 1000)
-            cx = random.randint(0, image_resolution[0])
-            cy = random.randint(0, image_resolution[1])
+            cam_fx =random.randint(800, 1000)
+            cam_fy = random.randint(800, 1000)
+            cx, cy = random_principal_point()
             s = round(random.uniform(0, 0.09), 2)
         K = np.array([[cam_fx, s, cx], [0., cam_fy, cy], [0., 0., 1.]])
 
@@ -109,7 +110,6 @@ if __name__ == '__main__':
                 K = conv_3param2K(f, image_resolution, cam_type=cam_type)
                 rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
                 cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
-                x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
                 if cam_type == 'fisheye':
                     x, _ = cv.fisheye.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
                 else:
