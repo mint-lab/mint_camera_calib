@@ -4,7 +4,6 @@ import cv2 as cv
 from scipy.spatial.transform import Rotation
 import random
 from camera_calibration import CameraModelCombination
-import pickle
 import pandas as pd
 
 def random_principal_point():
@@ -107,26 +106,27 @@ if __name__ == '__main__':
         distortions = cam_model.distortion[cam_type]
         for f in focal_lengths:
             for dist in distortions:
-                K = conv_3param2K(f, image_resolution, cam_type=cam_type)
-                rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
-                cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
-                if cam_type == 'fisheye':
-                    x, _ = cv.fisheye.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
-                else:
-                    x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
-                mean, standard_deviation = 0, 0.01
-                noise = np.random.normal(mean, standard_deviation, x.shape)
-                x_noise = x + noise
-                X = np.float32(X)
-                x_noise = np.float32(np.round(x_noise, decimals = 4))
-                file_name = 'data_synthetic/synthetic_img_pt' + str(ind_data) + '.npy'
-                np.save(file_name, x_noise) 
-                index.append(ind_data)
-                file_paths.append(file_name)
-                camera_model.append({'type' :cam_type, 'f': f, 'dist': dist})
-                intrinsic.append(K.flatten())
-                distortion.append(cam_dist_coeff)
-                ind_data += 1
+                for _ in range(10):
+                    K = conv_3param2K(f, image_resolution, cam_type=cam_type)
+                    rvec, tvec = conv_pose2Rt(cam_ori, cam_pos)
+                    cam_dist_coeff = generate_cam_dist_coeff(dist, cam_type=cam_type)
+                    if cam_type == 'fisheye':
+                        x, _ = cv.fisheye.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+                    else:
+                        x, _ = cv.projectPoints(X, rvec, tvec, K, cam_dist_coeff)
+                    mean, standard_deviation = 0, 0.01
+                    noise = np.random.normal(mean, standard_deviation, x.shape)
+                    x = x + noise
+                    X = np.float32(X)
+                    x = np.float32(np.round(x, decimals = 4))
+                    file_name = 'data_synthetic/synthetic_img_pt' + str(ind_data) + '.npy'
+                    np.save(file_name, x) 
+                    index.append(ind_data)
+                    file_paths.append(file_name)
+                    camera_model.append({'type' :cam_type, 'f': f, 'dist': dist})
+                    intrinsic.append(K.flatten())
+                    distortion.append(cam_dist_coeff)
+                    ind_data += 1
 
     df = pd.DataFrame({'ind' :index, 'file_path': file_paths, 'intrinsic': intrinsic, 'distortion': distortion,  "cam_model": camera_model})
     df.to_excel('data_synthetic/synthetic.xlsx', index=False)
