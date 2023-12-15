@@ -27,24 +27,29 @@ def normalize(array):
 
     return array
 
+def load_resuls(criteria_type, file_path):
+    if criteria_type == 'aic':
+        score = np.load(file_path + 'AIC.npy')
+    elif criteria_type == 'bic':
+        score = np.load(file_path + 'BIC.npy')
+    else:
+        train_error = np.load(file_path + 'train.npy')
+        test_error = np.load(file_path + 'test.npy')
+        score = caculate_model_score(train_error, test_error)
+    score = normalize(score)
+
+    return score
+
+
 if __name__ == '__main__':
-    
-    file_path = 'data_synthetic/fisheye_40/results/' 
-    # train_error = np.load(file_path + 'train.npy')
-    # test_error = np.load(file_path + 'test.npy')
-    # score = caculate_model_score(train_error, test_error)
-    # score = normalize(score)
-    # score = np.load(file_path + 'criteria_proposal.npy')
-    AIC = np.load(file_path + '/AIC.npy')
-    AIC = normalize(AIC)
+    file_path = 'results/synthetic/normal_40_random/' 
+    score =  load_resuls('bic', file_path)
 
     # AIC_confusion_matrix = max_value - AIC_confusion_matrix
-    index = ['PN1', 'PN2', 'PN3', 'PN4']
-    column = ['BC1', 'BC2', 'BC3', 'BC4', 'BC5', 'KB1', 'KB2', 'KB3', 'KB4', 'KB5']
-    index1= ['PF1', 'PF2', 'PF3', 'PF4']
-    
-    df = pd.DataFrame(AIC, index=index, columns=column)
-    
+    index = ['PN0', 'PN1', 'PN2', 'PN3']
+    column = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
+    index1= ['PF0', 'PF1', 'PF2', 'PF3']
+    df = pd.DataFrame(score, index=index, columns=column)
     
     # plt.figure(figsize=(10,7))
     sn.set(font_scale=0.65) # for label size
