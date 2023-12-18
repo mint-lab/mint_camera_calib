@@ -78,17 +78,17 @@ class DataSampling:
 
 class CalibrationFlag:
     def __init__(self):
-        self.focal_length            = {}
-        self.focal_length['normal']  = {}
-        self.focal_length['fisheye'] = {}
+        self.intrinsic            = {}
+        self.intrinsic['normal']  = {}
+        self.intrinsic['fisheye'] = {}
 
-        self.focal_length['normal']['f']            = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
-        self.focal_length['normal']['fx_fy']        = cv.CALIB_FIX_PRINCIPAL_POINT
-        self.focal_length['normal']['f_cx_cy']      =  cv.CALIB_FIX_ASPECT_RATIO
+        self.intrinsic['normal']['f']            = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
+        self.intrinsic['normal']['fx_fy']        = cv.CALIB_FIX_PRINCIPAL_POINT
+        self.intrinsic['normal']['f_cx_cy']      =  cv.CALIB_FIX_ASPECT_RATIO
 
-        self.focal_length['fisheye']['fx_fy']       = cv.fisheye.CALIB_FIX_SKEW + cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
-        self.focal_length['fisheye']['fx_fy_s']     = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
-        self.focal_length['fisheye']['fx_fy_cx_cy'] = cv.fisheye.CALIB_FIX_SKEW
+        self.intrinsic['fisheye']['f']           = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv.fisheye.CALIB_FIX_FOCAL_LENGTH
+        self.intrinsic['fisheye']['fx_fy']       = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
+        self.intrinsic['fisheye']['f_cx_cy']     = cv.fisheye.CALIB_FIX_FOCAL_LENGTH
     
 
         self.distortion            = {}
@@ -105,38 +105,38 @@ class CalibrationFlag:
         self.distortion['fisheye']['k1_k2_k3']     = cv.fisheye.CALIB_FIX_K4
         self.distortion['fisheye']['no']           = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
 
-    def make_cali_flag(self, focal_length, distortion, cam_type='normal'):
+    def make_cali_flag(self, intrinsic_type, dist_type, cam_type='normal'):
         fisheye_calib_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
         normal_calib_flag = None
 
-        focal_length_dict = self.focal_length[cam_type]
+        intrinsic_dict = self.intrinsic[cam_type]
         distortion_dict = self.distortion[cam_type]
 
         if cam_type == 'fisheye':
-            if distortion == 'k1_k2_k3_k4' and focal_length == 'fx_fy_cx_cy_s':
+            if dist_type == 'k1_k2_k3_k4' and intrinsic_type == 'fx_fy_cx_cy':
                 return fisheye_calib_flag
-            elif focal_length == 'fx_fy_cx_cy_s':
-                return fisheye_calib_flag + distortion_dict[distortion]
-            elif distortion == 'k1_k2_k3_k4':
-                return fisheye_calib_flag + focal_length_dict[focal_length]
+            elif intrinsic_type == 'fx_fy_cx_cy':
+                return fisheye_calib_flag + distortion_dict[dist_type]
+            elif dist_type == 'k1_k2_k3_k4':
+                return fisheye_calib_flag + intrinsic_dict[intrinsic_type]
             else:
-                return fisheye_calib_flag + focal_length_dict[focal_length] + distortion_dict[distortion]
+                return fisheye_calib_flag + intrinsic_dict[intrinsic_type] + distortion_dict[dist_type]
         else:
-            if distortion == 'k1_k2_p1_p2_k3' and focal_length == 'fx_fy_cx_cy':
+            if dist_type == 'k1_k2_p1_p2_k3' and intrinsic_type == 'fx_fy_cx_cy':
                 return normal_calib_flag
-            elif focal_length == 'fx_fy_cx_cy':
-                return distortion_dict[distortion]
-            elif distortion == 'k1_k2_p1_p2_k3':
-                return focal_length_dict[focal_length]
+            elif intrinsic_type == 'fx_fy_cx_cy':
+                return distortion_dict[dist_type]
+            elif dist_type == 'k1_k2_p1_p2_k3':
+                return intrinsic_dict[intrinsic_type]
             else:
-                return focal_length_dict[focal_length] + distortion_dict[distortion]
+                return intrinsic_dict[intrinsic_type] + distortion_dict[dist_type]
 
 
 class CameraModelCombination:
     def __init__(self):
-        self.focal_length            = {}
-        self.focal_length['normal']  = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
-        self.focal_length['fisheye'] = ['fx_fy', 'fx_fy_s', 'fx_fy_cx_cy', 'fx_fy_cx_cy_s']
+        self.intrinsic               = {}
+        self.intrinsic['normal']     = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
+        self.intrinsic['fisheye']    = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
     
 
         self.distortion              = {}
