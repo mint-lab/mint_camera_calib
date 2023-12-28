@@ -145,6 +145,13 @@ def find_df_min_value(df):
 
     return min_value, min_index, min_column
 
+def add_noise(x, mean=0, standard_deviation=0.01):
+    noise = np.random.normal(mean, standard_deviation, x.shape)
+    x = x + noise
+    x = np.float32(np.round(x, decimals = 4))
+
+    return x
+
 class CalibrationFlag:
     def __init__(self):
         self.proj_model_BC          = {}
