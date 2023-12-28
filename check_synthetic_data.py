@@ -87,7 +87,6 @@ def find_reproject_points(obj_points, rvecs, tvecs, K, dist_coef, dist_type):
 
     return reproj_img_points
 
-
 def find_reproj_error(obj_points, img_points, rvecs, tvecs, K, dist_coef, dist_type):
     mean_error = 0
     for i in range(len(obj_points)):
@@ -145,6 +144,7 @@ def find_df_min_value(df):
     min_index, min_column = df.stack().idxmin()
 
     return min_value, min_index, min_column
+
 class CalibrationFlag:
     def __init__(self):
         self.proj_model_BC          = {}
@@ -261,6 +261,7 @@ if __name__ == '__main__':
     best_model_AIC = []
     best_model_BIC = []
     best_model_proposal = []
+    ind = 1
     for img_pts_path in tqdm(img_pts_paths):
         img_pts = load_img_pts(img_pts_path )
         obj_pts = generate_obj_points(chessboard_pattern, len(img_pts))
@@ -280,13 +281,17 @@ if __name__ == '__main__':
         data = DataSampling(obj_pts, img_pts, chessboard_pattern)
         sampling_type = 'extrapolar'
         obj_pts_train, img_pts_train, obj_pts_test, img_pts_test = data.split_data(sampling_type=sampling_type)
-        train_error, test_error = train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test, img_pts_test, proj_model, dist_model, img_size)
-        np.save(os.path.join(save_path, 'train_error.npy'), train_error)
-        np.save(os.path.join(save_path, 'test_error.npy'), test_error)
+        train_error, test_error = train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test,
+                                                           img_pts_test, proj_model, dist_model, img_size)
+        # np.save(os.path.join(save_path, 'train_error.npy'), train_error)
+        # np.save(os.path.join(save_path, 'test_error.npy'), test_error)
         model_score = caculate_model_score(train_error, test_error)
         score_df = pd.DataFrame(model_score, index=proj_model, columns=dist_model)
         min_score, min_score_index, min_score_colums = find_df_min_value(score_df)
         best_model_proposal.append({'dist': min_score_colums, 'intrinsic': min_score_index})
+        print('index = ', ind)
+        ind += 1
+        print('=========================')
 
     df['AIC_cam_model_predict'] = best_model_AIC
     df['BIC_cam_model_predict'] = best_model_BIC
