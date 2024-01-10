@@ -100,16 +100,26 @@ def generate_img(obj_pts, K, dist_coef, dist_type, save_path):
                 img_pts, _ = cv.projectPoints(obj_pts, rvec, tvec, K, dist_coef)
             else:
                 img_pts, _ = cv.fisheye.projectPoints(obj_pts, rvec, tvec, K, dist_coef)
+            img_pts = add_noise(img_pts)
             save_img_pts(save_path, img_pts, ind)
             ind += 1
-        
+
+def add_noise(x, mean=0, standard_deviation=1):
+    noise = np.random.normal(mean, standard_deviation, x.shape)
+    x = x + noise
+    x = np.float32(np.round(x, decimals = 4))
+
+    return x
+
 
 if __name__ == '__main__':
     proj_model  = ['P0', 'P1', 'P2', 'P3']
     dist_model = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
     img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    data_path = 'data/synthetic/dataset/'
+    data_path = 'data/synthetic/dataset_noise_1/'
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
 
     ind = 1
     model_ind = []
@@ -120,22 +130,21 @@ if __name__ == '__main__':
     obj_pts = gen_chessboard_points(chessboard_pattern)
     for intrinsic_type in proj_model:
         for dist_type in dist_model:
-            K = generate_intrinsic_maxtrix(intrinsic_type, img_size)
-            dist_coef = generate_dist_coef(dist_type)
+            for _ in range(10):
+                K = generate_intrinsic_maxtrix(intrinsic_type, img_size)
+                dist_coef = generate_dist_coef(dist_type)
 
-            save_path = os.path.join(data_path, 'model_' + str(ind))
-            if not os.path.exists(save_path):
-                os.mkdir(save_path)
-            generate_img(obj_pts, K, dist_coef, dist_type, save_path)
+                save_path = os.path.join(data_path, 'model_' + str(ind))
+                if not os.path.exists(save_path):
+                    os.mkdir(save_path)
+                generate_img(obj_pts, K, dist_coef, dist_type, save_path)
 
-            model_ind.append(ind)
-            synthetic_path.append(save_path)
-            cam_model.append({'dist': dist_type, 'intrinsic': intrinsic_type})
-            K_original.append(K)
-            dist_original.append(dist_coef)
-            ind += 1
+                model_ind.append(ind)
+                synthetic_path.append(save_path)
+                cam_model.append({'dist': dist_type, 'intrinsic': intrinsic_type})
+                K_original.append(K)
+                dist_original.append(dist_coef)
+                ind += 1
     data = {'index': model_ind, 'path': synthetic_path, 'cam_model': cam_model, 'K_original': K_original, 'dist_original': dist_original}  
     df = pd.DataFrame(data)
     df.to_excel(data_path + 'synthetic_data.xlsx', index=False)
-
-
