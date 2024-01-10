@@ -1,23 +1,197 @@
-import numpy as np
-import cv2 as cv
 import glob
-import pandas as pd
-from tqdm import tqdm
 import os
 import random
-from pprint import pprint
+import pandas as pd
+import numpy as np
+import cv2 as cv
+from tqdm import tqdm
 
-class ObjPoints:
-    def __init__(self, board_pattern):
-        self.board_pattern = board_pattern
 
-    def initilize_obj_points(self, len_img_points):
-        obj_pts = [[c, r, 0] for r in range(self.board_pattern[1]) for c in range(self.board_pattern[0])]
-        obj_points = [np.array(obj_pts, dtype=np.float32)] * len_img_points # Must be 'np.float32'
-        row, col = obj_points[0].shape
-        obj_points = [x.reshape(row, 1, col) for x in obj_points]
-        return obj_points
+def generate_obj_points(board_pattern, len_img_points):
+    obj_pts = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
+    obj_points = [np.array(obj_pts, dtype=np.float32)] * len_img_points # Must be 'np.float32'
+    row, col = obj_points[0].shape
+    obj_points = [x.reshape(row, 1, col) for x in obj_points]
+    return obj_points
 
+def load_img_pts(img_pts_path):
+    all_files = glob.glob(os.path.join(img_pts_path, 'img*.npy'))
+    img_pts = [np.load(file) for file in all_files]
+    return img_pts
+
+def calibrate(obj_pts, img_pts, img_size, dist_type, flags, K=None, dist_coef=None):
+    if dist_type.startswith('BC'):
+        return cv.calibrateCamera(obj_pts, img_pts, img_size[::-1], cameraMatrix=K, distCoeffs=dist_coef, flags=flags)
+    else:
+        try:
+            return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K, D=dist_coef, flags=flags)
+        except:
+            K_init = np.array([[850., 0, 600.], [0., 850., 600.], [0., 0., 1.]])
+            dist_coef_init = np.array([0., 0., 0., 0.])
+            flags -= cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+            flags += cv.fisheye.CALIB_USE_INTRINSIC_GUESS
+            print(dist_type)
+            print(flags)
+            return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K_init, D=dist_coef_init, flags=flags)
+
+'''
+def cal_aic(RMSE, dist_type, intrinsic_type, N_samples):
+    proj_model_num_para = {'P0':1, 'P1':2, 'P2': 3, 'P3': 4}
+    dist_model_num_para = {'BC0': 0, 'BC1': 1, 'BC2': 2, 'BC3': 3, 'BC4': 5, 
+                           'KB0': 0, 'KB1': 1, 'KB2': 2, 'KB3': 3, 'KB4': 4}
+    
+    num_para = proj_model_num_para[intrinsic_type] + dist_model_num_para[dist_type]
+
+    return N_samples * np.log(pow(RMSE, 2)) + 2 * num_para
+
+def cal_bic(RMSE, dist_type, intrinsic_type, N_samples):
+    proj_model_num_para = {'P0':1, 'P1':2, 'P2': 3, 'P3': 4}
+    dist_model_num_para = {'BC0': 0, 'BC1': 1, 'BC2': 2, 'BC3': 3, 'BC4': 5, 
+                           'KB0': 0, 'KB1': 1, 'KB2': 2, 'KB3': 3, 'KB4': 4}
+    
+    num_para = proj_model_num_para[intrinsic_type] + dist_model_num_para[dist_type]
+
+    return N_samples * np.log(pow(RMSE, 2)) + num_para * np.log10(N_samples)
+'''
+
+def cal_AIC(RMSE, N_samples):
+    proj_model_num_para = [1, 2, 3, 4]
+    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
+
+    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
+
+    return N_samples * np.log(pow(RMSE, 2)) + 2 * num_para
+
+def cal_BIC(RMSE, N_samples):
+    proj_model_num_para = [1, 2, 3, 4]
+    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
+
+    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
+
+    return N_samples * np.log(pow(RMSE, 2)) + num_para * np.log10(N_samples)
+
+def cali_error_process(obj_pts, img_pts, proj_model, dist_model, img_size):
+    RMSEs = []
+    for intrinsic_type in proj_model:
+        RMSE = []
+        for dist_type in dist_model:
+            calibrate_flag = CalibrationFlag()
+            flags = calibrate_flag.make_flag(intrinsic_type, dist_type)
+            rms, K, dist_coef, rvecs, tvecs= calibrate(obj_pts, img_pts, img_size, dist_type=dist_type, flags=flags)
+            RMSE.append(rms)
+        RMSEs.append(RMSE)
+    return np.array(RMSEs)
+
+def find_reproject_points(obj_points, rvecs, tvecs, K, dist_coef, dist_type):
+    if dist_type.startswith('KB'):
+        reproj_img_points, _ = cv.fisheye.projectPoints(obj_points, rvecs, tvecs, K, dist_coef)
+    else:
+        reproj_img_points, _ = cv.projectPoints(obj_points, rvecs, tvecs, K, dist_coef)
+
+    return reproj_img_points
+
+def find_reproj_error(obj_points, img_points, rvecs, tvecs, K, dist_coef, dist_type):
+    mean_error = 0
+    for i in range(len(obj_points)):
+        reproj_img_points = find_reproject_points(obj_points[i], rvecs[i], tvecs[i], K, dist_coef, dist_type)
+        error = cv.norm(img_points[i], reproj_img_points, cv.NORM_L2) / np.sqrt(len(reproj_img_points))
+        mean_error += error
+
+    return mean_error / len(obj_points)
+
+def train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test, img_pts_test, proj_model, dist_model, img_size):
+    train_error_all = []
+    test_error_all = []
+    for intrinsic_type in proj_model:
+        train_error = []
+        test_error = []
+        for dist_type in dist_model:
+            calibrate_flag = CalibrationFlag()
+            flags = calibrate_flag.make_flag(intrinsic_type, dist_type)
+            rms, K, dist_coef, rvecs, tvecs= calibrate(obj_pts_train, img_pts_train, img_size, dist_type=dist_type, flags=flags)
+            train_error.append(rms)
+
+            rms_test = find_reproj_error(obj_pts_test, img_pts_test, rvecs, tvecs, K, dist_coef, dist_type)
+            test_error.append(rms_test)
+
+        train_error_all.append(train_error)
+        test_error_all.append(test_error)
+    return np.array(train_error_all), np.array(test_error_all)
+
+def caculate_model_score(train_error, test_error):
+    test_error_weight = 1e-3
+    train_error_weight = 1e-3
+    ratio_weight = 1
+
+    train_test_ratio = train_error / test_error
+
+    # return -np.log(test_error_weight / test_error + train_error_weight / train_error + ratio_weight * train_test_ratio)
+    num_para = get_num_para()
+    return np.log(train_error + test_error + pow(train_error, 2) / test_error + num_para * train_error)
+
+def get_num_para():
+    dists = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
+    intrinsics = [1, 2, 3, 4]
+
+    num_para = []
+    for intrinsic in intrinsics:
+        tmp = []
+        for dist in dists:
+            tmp.append(dist + intrinsic)
+        num_para.append(tmp)
+
+    return np.array(num_para)
+
+def find_df_min_value(df):
+    min_value = df.stack().min()
+    min_index, min_column = df.stack().idxmin()
+
+    return min_value, min_index, min_column
+
+class CalibrationFlag:
+    def __init__(self):
+        self.proj_model_BC          = {}
+        self.proj_model_BC['P0']    = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_BC['P1']    = cv.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_BC['P2']    =  cv.CALIB_FIX_ASPECT_RATIO
+
+        self.proj_model_KB          = {}
+        self.proj_model_KB['P0']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv.fisheye.CALIB_FIX_FOCAL_LENGTH
+        self.proj_model_KB['P1']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_KB['P2']    = cv.fisheye.CALIB_FIX_FOCAL_LENGTH
+    
+        self.dist_model             = {}
+        self.dist_model['BC0']      = cv.CALIB_FIX_K1 + cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
+        self.dist_model['BC1']      = cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
+        self.dist_model['BC2']      = cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
+        self.dist_model['BC3']      = cv. CALIB_ZERO_TANGENT_DIST
+        self.dist_model['KB0']      = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
+        self.dist_model['KB1']      = cv.fisheye.CALIB_FIX_K2 + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4  
+        self.dist_model['KB2']      = cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
+        self.dist_model['KB3']      = cv.fisheye.CALIB_FIX_K4
+
+    def make_flag(self, intrinsic_type, dist_type):
+        KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+        BC_flag = None
+
+        if dist_type.startswith('BC'):
+            if dist_type == 'BC4' and intrinsic_type == 'P3':
+                return BC_flag
+            elif intrinsic_type == 'P3':
+                return self.dist_model[dist_type]
+            elif dist_type == 'BC4':
+                return self.proj_model_BC[intrinsic_type]
+            else:
+                return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
+        else:
+            if dist_type == 'KB4' and intrinsic_type == 'P3':
+                return KB_flag
+            elif intrinsic_type == 'P3':
+                return KB_flag + self.dist_model[dist_type]
+            elif dist_type == 'KB4':
+                return KB_flag + self.proj_model_KB[intrinsic_type]
+            else:
+                return KB_flag + self.proj_model_KB[intrinsic_type] + self.dist_model[dist_type]
 
 class DataSampling:
     def __init__(self, obj_pts, img_pts, board_pattern):
@@ -76,208 +250,54 @@ class DataSampling:
         return selected_slice_train, selected_slice_test
 
 
-class CalibrationFlag:
-    def __init__(self):
-        self.intrinsic            = {}
-        self.intrinsic['normal']  = {}
-        self.intrinsic['fisheye'] = {}
-
-        self.intrinsic['normal']['f']            = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
-        self.intrinsic['normal']['fx_fy']        = cv.CALIB_FIX_PRINCIPAL_POINT
-        self.intrinsic['normal']['f_cx_cy']      =  cv.CALIB_FIX_ASPECT_RATIO
-
-        self.intrinsic['fisheye']['f']           = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv.fisheye.CALIB_FIX_FOCAL_LENGTH
-        self.intrinsic['fisheye']['fx_fy']       = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
-        self.intrinsic['fisheye']['f_cx_cy']     = cv.fisheye.CALIB_FIX_FOCAL_LENGTH
-    
-
-        self.distortion            = {}
-        self.distortion['normal']  = {}
-        self.distortion['fisheye'] = {}
-        
-        self.distortion['normal']['k1']            = cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
-        self.distortion['normal']['k1_k2']         = cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
-        self.distortion['normal']['k1_k2_k3']      = cv. CALIB_ZERO_TANGENT_DIST
-        self.distortion['normal']['no']            = cv.CALIB_FIX_K1 + cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
-        
-        self.distortion['fisheye']['k1']           = cv.fisheye.CALIB_FIX_K2 + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4  
-        self.distortion['fisheye']['k1_k2']        = cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
-        self.distortion['fisheye']['k1_k2_k3']     = cv.fisheye.CALIB_FIX_K4
-        self.distortion['fisheye']['no']           = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
-
-    def make_cali_flag(self, intrinsic_type, dist_type, cam_type='normal'):
-        fisheye_calib_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
-        normal_calib_flag = None
-
-        intrinsic_dict = self.intrinsic[cam_type]
-        distortion_dict = self.distortion[cam_type]
-
-        if cam_type == 'fisheye':
-            if dist_type == 'k1_k2_k3_k4' and intrinsic_type == 'fx_fy_cx_cy':
-                return fisheye_calib_flag
-            elif intrinsic_type == 'fx_fy_cx_cy':
-                return fisheye_calib_flag + distortion_dict[dist_type]
-            elif dist_type == 'k1_k2_k3_k4':
-                return fisheye_calib_flag + intrinsic_dict[intrinsic_type]
-            else:
-                return fisheye_calib_flag + intrinsic_dict[intrinsic_type] + distortion_dict[dist_type]
-        else:
-            if dist_type == 'k1_k2_p1_p2_k3' and intrinsic_type == 'fx_fy_cx_cy':
-                return normal_calib_flag
-            elif intrinsic_type == 'fx_fy_cx_cy':
-                return distortion_dict[dist_type]
-            elif dist_type == 'k1_k2_p1_p2_k3':
-                return intrinsic_dict[intrinsic_type]
-            else:
-                return intrinsic_dict[intrinsic_type] + distortion_dict[dist_type]
-
-
-class CameraModelCombination:
-    def __init__(self):
-        self.intrinsic               = {}
-        self.intrinsic['normal']     = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
-        self.intrinsic['fisheye']    = ['f', 'fx_fy', 'f_cx_cy', 'fx_fy_cx_cy']
-    
-
-        self.distortion              = {}
-        self.distortion['normal']    = ['no', 'k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_p1_p2_k3']
-        self.distortion['fisheye']   = ['no', 'k1', 'k1_k2', 'k1_k2_k3', 'k1_k2_k3_k4']
-
-
-def load_img(input_path):
-    files = glob.glob(input_path + '*.png')
-    img_select = [cv.imread(file) for file in files]
-    return img_select
-
-
-def find_chessboard_corners(images, board_pattern):
-
-    # Find 2D corner points from given images
-    img_points = []
-    for img in images:
-        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        complete, pts = cv.findChessboardCorners(gray, board_pattern)
-        if complete:
-            criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-            corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
-            img_points.append(corners)
-    assert len(img_points) > 0
-
-    return img_points, gray.shape
-
-
-def calibrate(train_obj_points, train_img_points, img_size, cam_type='normal', K=None, dist=None, flag_cali=None):
-    if cam_type == 'fisheye':
-        return cv.fisheye.calibrate(train_obj_points, train_img_points, img_size[::-1], K=K, D=dist, flags=flag_cali)
-    else:
-        return cv.calibrateCamera(train_obj_points, train_img_points, img_size[::-1], cameraMatrix=K, distCoeffs=dist, flags=flag_cali)
-
-
-def find_reproject_points(obj_points, rvecs, tvecs, K, dist, cam_type='normal'):
-    if cam_type == 'fisheye':
-        reproj_img_points, _ = cv.fisheye.projectPoints(obj_points, rvecs, tvecs, K, dist)
-    else:
-        reproj_img_points, _ = cv.projectPoints(obj_points, rvecs, tvecs, K, dist)
-
-    return reproj_img_points
-
-
-def cal_error(obj_points, img_points, rvecs, tvecs, K, dist, cam_type='normal'):
-    mean_error = 0
-    for i in range(len(obj_points)):
-        reproj_img_points = find_reproject_points(obj_points[i], rvecs[i], tvecs[i], K, dist, cam_type)
-        error = cv.norm(img_points[i], reproj_img_points, cv.NORM_L2) / np.sqrt(len(reproj_img_points))
-        mean_error += error
-
-    return mean_error / len(obj_points)
-
-
-def train_test_process(obj_points_train, img_points_train, obj_points_test, img_points_test, img_size, f, dist, cam_type='normal'):
-    # Create a flag for calibration
-    cali_flag = CalibrationFlag()
-    flags_calibrate = cali_flag.make_cali_flag(focal_length=f, distortion=dist, cam_type=cam_type)
-
-    # TRAIN
-    rms_train, K_train, dist_train, rvecs_train, tvecs_train = calibrate(obj_points_train, img_points_train, 
-                                                                        img_size, flag_cali=flags_calibrate, cam_type=cam_type)
-    # TEST
-    train_error = cal_error(obj_points_train, img_points_train, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type)
-    test_error = cal_error(obj_points_test, img_points_test, rvecs_train, tvecs_train, K_train, dist_train, cam_type=cam_type)
-
-    return train_error, test_error
-
-
-def caculate_model_score(train_error, test_error, f, dist):
-    test_error_weight = 1
-    train_error_weight = 1
-    train_test_weight = 0.05
-    num_parameter_weight = 0.05
-
-    if dist == 'no':
-        num_para = len(f.split('_'))
-    else:
-        num_para = len(f.split('_')) + len(dist.split('_'))
-
-    train_test_ratio = test_error / train_error
-
-    return test_error_weight * test_error + train_error_weight * train_error + train_test_weight * train_test_ratio + num_parameter_weight * num_para
-
-
 if __name__ == '__main__':
-    num_data = 1
-    input_file = 'data/image_' + str(num_data) + '/'
-    result_path = 'results/'
-    if not os.path.isdir(result_path):
-        os.mkdir(result_path)
-
+    img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    images = load_img(input_file)
-    img_points, img_size = find_chessboard_corners(images, chessboard_pattern)
-  
-    # Create object points data
-    obj_3d = ObjPoints(chessboard_pattern)
-    obj_points= obj_3d.initilize_obj_points(len(img_points))
+    save_path = 'data/synthetic/dataset_noise_1'
 
-    cam_types = ['normal', 'fisheye']
-    data_sampling_types = ['extrapolar', 'interpolar', 'random']
-    cam_model = CameraModelCombination()
+    df = pd.read_excel(os.path.join(save_path, 'synthetic_data.xlsx'))
+    img_pts_paths = df['path']
+    cam_model = df['cam_model']
+    proj_model = ['P0', 'P1', 'P2', 'P3']
+    dist_model = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
 
-    best_combination = {}
-    model_best_score = 100
-    combination_results = []
-    for cam_type in tqdm(cam_types):
-        frame = []
-        focal_lengths = cam_model.focal_length[cam_type]
-        distortions = cam_model.distortion[cam_type]
-        for data_sampling_type in data_sampling_types:
-            # Split data into train and test data
-            data_maker = DataSampling(obj_points, img_points, chessboard_pattern)
-            obj_points_train, img_points_train, obj_points_test, img_points_test = data_maker.split_data(sampling_type=data_sampling_type)
+    best_model_AIC = []
+    best_model_BIC = []
+    best_model_proposal = []
+    ind = 1
+    for img_pts_path in tqdm(img_pts_paths):
+        img_pts = load_img_pts(img_pts_path)
+        obj_pts = generate_obj_points(chessboard_pattern, len(img_pts))
+        N_samples = len(obj_pts) * obj_pts[0].shape[0]
+        RMSE = cali_error_process(obj_pts, img_pts, proj_model, dist_model, img_size)
+        np.save(os.path.join(img_pts_path, 'rms.npy'), RMSE)
 
-            results = []
-            for f in focal_lengths:
-                result = []
-                for dist in distortions:
-                    train_error, test_error = train_test_process(obj_points_train, img_points_train, obj_points_test, img_points_test, img_size, f, dist, cam_type)
-                    model_score = caculate_model_score(train_error, test_error, f, dist)
-                    if model_score < model_best_score:
-                        model_best_score = model_score
-                        best_combination['cam_type'] = cam_type
-                        best_combination['focal_lengths'] = f
-                        best_combination['distortions'] = dist
-                        best_combination['train_error'] = train_error
-                        best_combination['test_error'] = test_error
-                        best_combination['model_best_score'] = model_best_score
-                    result.append({'train': f"{round(train_error, 2):.2f}", 'test': f"{round(test_error, 2):.2f}"})
-                results.append(result)   
+        AIC = cal_AIC(RMSE, N_samples)
+        AIC_df = pd.DataFrame(AIC, index=proj_model, columns=dist_model)
+        min_AIC, min_AIC_index, min_AIC_column = find_df_min_value(AIC_df)
+        best_model_AIC.append({'dist': min_AIC_column, 'intrinsic': min_AIC_index})
 
-            df = pd.DataFrame(results, index= focal_lengths, columns=distortions)
-            frame.append(df)
-        combination_results.append(frame)
-    pprint(best_combination)
-               
-    with pd.ExcelWriter(result_path + 'results_' + str(num_data) + '.xlsx') as writer:
-        for df_ind, df in enumerate(combination_results):
-            df = pd.concat(df, axis=0)
-            df.to_excel(writer, sheet_name='all', startcol=df_ind * (df.shape[1] + 1))
-            df.to_excel(writer, sheet_name= cam_types[df_ind], index=False)
+        BIC = cal_BIC(RMSE, N_samples)
+        BIC_df = pd.DataFrame(BIC, index=proj_model, columns=dist_model)
+        min_BIC, min_BIC_index, min_BIC_column = find_df_min_value(BIC_df)
+        best_model_BIC.append({'dist': min_BIC_column, 'intrinsic': min_BIC_index})
+
+        data = DataSampling(obj_pts, img_pts, chessboard_pattern)
+        sampling_type = 'extrapolar'
+        obj_pts_train, img_pts_train, obj_pts_test, img_pts_test = data.split_data(sampling_type=sampling_type)
+        train_error, test_error = train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test,
+                                                           img_pts_test, proj_model, dist_model, img_size)
+        np.save(os.path.join(img_pts_path, 'train_error_' + sampling_type + '.npy'), train_error)
+        np.save(os.path.join(img_pts_path, 'test_error_' + sampling_type + '.npy'), test_error)
+        model_score = caculate_model_score(train_error, test_error)
+        score_df = pd.DataFrame(model_score, index=proj_model, columns=dist_model)
+        min_score, min_score_index, min_score_colums = find_df_min_value(score_df)
+        best_model_proposal.append({'dist': min_score_colums, 'intrinsic': min_score_index})
+        print('index = ', ind)
+        ind += 1
+        print('=========================')
+
+    df['AIC_cam_model_predict'] = best_model_AIC
+    df['BIC_cam_model_predict'] = best_model_BIC
+    df['proposal_cam_model_predict'] = best_model_proposal
+    df.to_excel(os.path.join(save_path, 'accuracy.xlsx'), index=False)
