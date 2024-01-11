@@ -119,28 +119,12 @@ def train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test, img_pts
     return np.array(train_error_all), np.array(test_error_all)
 
 def caculate_model_score(train_error, test_error):
-    test_error_weight = 1e-3
-    train_error_weight = 1e-3
-    ratio_weight = 1
+    proj_model_num_para = [1, 2, 3, 4]
+    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
+    
+    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
 
-    train_test_ratio = train_error / test_error
-
-    # return -np.log(test_error_weight / test_error + train_error_weight / train_error + ratio_weight * train_test_ratio)
-    num_para = get_num_para()
     return np.log(train_error + test_error + pow(train_error, 2) / test_error + num_para * train_error)
-
-def get_num_para():
-    dists = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
-    intrinsics = [1, 2, 3, 4]
-
-    num_para = []
-    for intrinsic in intrinsics:
-        tmp = []
-        for dist in dists:
-            tmp.append(dist + intrinsic)
-        num_para.append(tmp)
-
-    return np.array(num_para)
 
 def find_df_min_value(df):
     min_value = df.stack().min()
