@@ -14,21 +14,21 @@ def gen_chessboard_points(chessboard_pattern, cellsize=0.025, dtype=np.float32):
     return obj_pts
 
 def random_principal_point(img_size):
-    cx = random.randint(img_size[1] / 2 - 10, img_size[1] / 2 + 10)
-    cy = random.randint(img_size[0] / 2 - 10, img_size[0] / 2 + 10)
+    cx = random.randint((img_size[1] - 1) / 2 - 10, img_size[1] / 2 + 10)
+    cy = random.randint((img_size[0] - 1) / 2 - 10, img_size[0] / 2 + 10)
 
     return cx, cy  
 
 def generate_intrinsic_maxtrix(intrinsic_type, img_size):
     if intrinsic_type == 'P0':
         fx = fy = random.randint(800, 1000)
-        cx = img_size[1] / 2
-        cy = img_size[0] / 2
+        cx = (img_size[1] - 1) / 2
+        cy = (img_size[0] - 1) / 2
     elif intrinsic_type == 'P1':
-        fx =random.randint(800, 1000)
+        fx = random.randint(800, 1000)
         fy = random.randint(800, 1000)
-        cx = img_size[1] / 2
-        cy = img_size[0] / 2
+        cx = (img_size[1] - 1) / 2
+        cy = (img_size[0] - 1) / 2
     elif intrinsic_type == 'P2':
         fx = fy = random.randint(800, 1000)
         cx, cy = random_principal_point(img_size)
