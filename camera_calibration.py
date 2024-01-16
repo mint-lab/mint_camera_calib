@@ -140,9 +140,7 @@ class CalibrationFlag:
         self.proj_model_BC['P2']    =  cv.CALIB_FIX_ASPECT_RATIO
 
         self.proj_model_KB          = {}
-        self.proj_model_KB['P0']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT + cv.fisheye.CALIB_FIX_FOCAL_LENGTH
         self.proj_model_KB['P1']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
-        self.proj_model_KB['P2']    = cv.fisheye.CALIB_FIX_FOCAL_LENGTH
     
         self.dist_model             = {}
         self.dist_model['BC0']      = cv.CALIB_FIX_K1 + cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
@@ -152,10 +150,9 @@ class CalibrationFlag:
         self.dist_model['KB0']      = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
         self.dist_model['KB1']      = cv.fisheye.CALIB_FIX_K2 + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4  
         self.dist_model['KB2']      = cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
-        self.dist_model['KB3']      = cv.fisheye.CALIB_FIX_K4
 
     def make_flag(self, intrinsic_type, dist_type):
-        KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
+        KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv.fisheye.CALIB_FIX_SKEW
         BC_flag = None
 
         if dist_type.startswith('BC'):
@@ -168,12 +165,8 @@ class CalibrationFlag:
             else:
                 return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
         else:
-            if dist_type == 'KB4' and intrinsic_type == 'P3':
-                return KB_flag
-            elif intrinsic_type == 'P3':
+            if intrinsic_type == 'P3':
                 return KB_flag + self.dist_model[dist_type]
-            elif dist_type == 'KB4':
-                return KB_flag + self.proj_model_KB[intrinsic_type]
             else:
                 return KB_flag + self.proj_model_KB[intrinsic_type] + self.dist_model[dist_type]
 
