@@ -1,51 +1,60 @@
 import re
+import os
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import cv2 as cv
 from camera_calibration import calibrate, generate_obj_points, load_img_pts, CalibrationFlag
 
-df = pd.read_excel('data/synthetic/dataset_noise_1/accuracy_extrapolar_noise_1.xlsx')
-df1 = pd.read_excel('data/synthetic/dataset_noise_1/accuracy_random_noise_1.xlsx')
-img_pts_paths = df['path']
-intrinsic_original = df['K_original']
+path = 'data/synthetic'
+sampling_type = 'interpolar'
+df_ori = pd.read_excel(os.path.join(path, 'synthetic_data.xlsx'))
+df_AIC = pd.read_excel(os.path.join(path, 'AIC.xlsx'))
+df_BIC = pd.read_excel(os.path.join(path, 'BIC.xlsx'))
+df_proposal = pd.read_excel(os.path.join(path, sampling_type + '.xlsx'))
 
-# Check accuracy
+# Check accuracy for choosing the distortion model
 AIC_count = 0
 BIC_count = 0
 proposal_count = 0
-cam_model_ogiginal = df['cam_model']
-AIC_cam_model_predicted = df['AIC_cam_model_predict']
-BIC_cam_model_predicted = df['BIC_cam_model_predict']
-proposal_cam_model_predict = df['proposal_cam_model_predict']
-for i, j, k, m in zip(cam_model_ogiginal, AIC_cam_model_predicted, BIC_cam_model_predicted, proposal_cam_model_predict):
-    i = eval(i)
-    j = eval(j)
-    k = eval(k)
-    m = eval(m)
-    if i['dist'] == j['dist']:
+img_pts_paths = df_ori['path']
+intrinsic_original = df_ori['K_original']
+ori_cam_model= df_ori['ori_model']
+predicted_model_AIC = df_AIC['AIC_cam_model_predict']
+predicted_model_BIC = df_BIC['BIC_cam_model_predict']
+predicted_model_proposal = df_proposal['proposal_cam_model_predict']
+
+ind = 1
+for ori_model, AIC_model, BIC_model, prosal_model in zip(ori_cam_model, predicted_model_AIC, predicted_model_BIC, predicted_model_proposal):
+    ori_model = eval(ori_model)
+    AIC_model = eval(AIC_model)
+    BIC_model = eval(BIC_model)
+    prosal_model = eval(prosal_model) 
+
+    if ori_model['dist'] == AIC_model['dist']:
         AIC_count += 1
-    if i['dist'] == k['dist']:
+    if ori_model['dist'] == BIC_model['dist']:
         BIC_count += 1
-    if i['dist'] == m['dist']:
+    if ori_model['dist'] == prosal_model['dist']:
         proposal_count += 1
+
 print(AIC_count)
-print(AIC_count / 400 * 100)
+print(AIC_count / len(df_AIC) * 100)
 print('=============================')
 print(BIC_count)
-print(BIC_count / 400 * 100)
+print(BIC_count / len(df_BIC) * 100)
 print('=============================')
 print(proposal_count)
-print(proposal_count / 400 * 100)
+print(proposal_count / len(df_proposal) * 100)
 
-# Check Principal Point, Focal Length, Reprojection Error
+# Check RMSE for Focal Length, Principal Point, Reprojection Error
 # chessboard_pattern = (10, 7)
 # img_size = (960, 1280)
 # f_error = []
 # principal_pt_error = []
 # rmse = []
-# proposal_cam_model_predict = df1['proposal_cam_model_predict']
-# for i in tqdm(range(len(df))):
+# proposal_cam_model_predict = df_proposal['proposal_cam_model_predict']
+# for i in tqdm(range(len(df_ori))):
 #     img_pts = load_img_pts(img_pts_paths[i])
 #     obj_pts = generate_obj_points(chessboard_pattern, len(img_pts))
 #     calibrate_flag = CalibrationFlag()
