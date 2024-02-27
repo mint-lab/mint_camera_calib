@@ -26,49 +26,10 @@ def calibrate(obj_pts, img_pts, img_size, dist_type, flags, K=None, dist_coef=No
         try:
             return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K, D=dist_coef, flags=flags)
         except:
-            K_init = np.array([[850., 0, 600.], [0., 850., 600.], [0., 0., 1.]])
-            dist_coef_init = np.array([0., 0., 0., 0.])
             flags -= cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC
-            flags += cv.fisheye.CALIB_USE_INTRINSIC_GUESS
             print(dist_type)
             print(flags)
-            return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K_init, D=dist_coef_init, flags=flags)
-
-'''
-def cal_aic(RMSE, dist_type, intrinsic_type, N_samples):
-    proj_model_num_para = {'P0':1, 'P1':2, 'P2': 3, 'P3': 4}
-    dist_model_num_para = {'BC0': 0, 'BC1': 1, 'BC2': 2, 'BC3': 3, 'BC4': 5, 
-                           'KB0': 0, 'KB1': 1, 'KB2': 2, 'KB3': 3, 'KB4': 4}
-    
-    num_para = proj_model_num_para[intrinsic_type] + dist_model_num_para[dist_type]
-
-    return N_samples * np.log(pow(RMSE, 2)) + 2 * num_para
-
-def cal_bic(RMSE, dist_type, intrinsic_type, N_samples):
-    proj_model_num_para = {'P0':1, 'P1':2, 'P2': 3, 'P3': 4}
-    dist_model_num_para = {'BC0': 0, 'BC1': 1, 'BC2': 2, 'BC3': 3, 'BC4': 5, 
-                           'KB0': 0, 'KB1': 1, 'KB2': 2, 'KB3': 3, 'KB4': 4}
-    
-    num_para = proj_model_num_para[intrinsic_type] + dist_model_num_para[dist_type]
-
-    return N_samples * np.log(pow(RMSE, 2)) + num_para * np.log10(N_samples)
-'''
-
-def cal_AIC(RMSE, N_samples):
-    proj_model_num_para = [1, 2, 3, 4]
-    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
-
-    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
-
-    return N_samples * np.log(pow(RMSE, 2)) + 2 * num_para
-
-def cal_BIC(RMSE, N_samples):
-    proj_model_num_para = [1, 2, 3, 4]
-    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
-
-    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
-
-    return N_samples * np.log(pow(RMSE, 2)) + num_para * np.log10(N_samples)
+            return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K, D=dist_coef, flags=flags)
 
 def cali_error_process(obj_pts, img_pts, proj_model, dist_model, img_size):
     RMSEs = []
@@ -117,14 +78,6 @@ def train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test, img_pts
         train_error_all.append(train_error)
         test_error_all.append(test_error)
     return np.array(train_error_all), np.array(test_error_all)
-
-def caculate_model_score(train_error, test_error):
-    proj_model_num_para = [1, 2, 3, 4]
-    dist_model_num_para = [0, 1, 2, 3, 5, 0, 1, 2, 3, 4]
-    
-    num_para = np.array([[dist + f for dist in dist_model_num_para] for f in proj_model_num_para])
-
-    return np.log(train_error + test_error + pow(train_error, 2) / test_error + num_para * train_error)
 
 def find_df_min_value(df):
     min_value = df.stack().min()
@@ -230,51 +183,21 @@ class DataSampling:
 if __name__ == '__main__':
     img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    save_path = 'data/synthetic/dataset_noise_1'
+    save_path = 'data/synthetic'
 
     df = pd.read_excel(os.path.join(save_path, 'synthetic_data.xlsx'))
     img_pts_paths = df['path']
-    cam_model = df['cam_model']
-    proj_model = ['P0', 'P1', 'P2', 'P3']
-    dist_model = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
+    cam_model = df['ori_model']
+    proj_model_BC = ['P0', 'P1', 'P2', 'P3']
+    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4']
+    proj_model_KB = ['P1', 'P3']
+    dist_model_KB =['KB0', 'KB1', 'KB2']
 
-    best_model_AIC = []
-    best_model_BIC = []
-    best_model_proposal = []
-    ind = 1
     for img_pts_path in tqdm(img_pts_paths):
         img_pts = load_img_pts(img_pts_path)
         obj_pts = generate_obj_points(chessboard_pattern, len(img_pts))
         N_samples = len(obj_pts) * obj_pts[0].shape[0]
-        RMSE = cali_error_process(obj_pts, img_pts, proj_model, dist_model, img_size)
-        np.save(os.path.join(img_pts_path, 'rms.npy'), RMSE)
-
-        AIC = cal_AIC(RMSE, N_samples)
-        AIC_df = pd.DataFrame(AIC, index=proj_model, columns=dist_model)
-        min_AIC, min_AIC_index, min_AIC_column = find_df_min_value(AIC_df)
-        best_model_AIC.append({'dist': min_AIC_column, 'intrinsic': min_AIC_index})
-
-        BIC = cal_BIC(RMSE, N_samples)
-        BIC_df = pd.DataFrame(BIC, index=proj_model, columns=dist_model)
-        min_BIC, min_BIC_index, min_BIC_column = find_df_min_value(BIC_df)
-        best_model_BIC.append({'dist': min_BIC_column, 'intrinsic': min_BIC_index})
-
-        data = DataSampling(obj_pts, img_pts, chessboard_pattern)
-        sampling_type = 'extrapolar'
-        obj_pts_train, img_pts_train, obj_pts_test, img_pts_test = data.split_data(sampling_type=sampling_type)
-        train_error, test_error = train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test,
-                                                           img_pts_test, proj_model, dist_model, img_size)
-        np.save(os.path.join(img_pts_path, 'train_error_' + sampling_type + '.npy'), train_error)
-        np.save(os.path.join(img_pts_path, 'test_error_' + sampling_type + '.npy'), test_error)
-        model_score = caculate_model_score(train_error, test_error)
-        score_df = pd.DataFrame(model_score, index=proj_model, columns=dist_model)
-        min_score, min_score_index, min_score_colums = find_df_min_value(score_df)
-        best_model_proposal.append({'dist': min_score_colums, 'intrinsic': min_score_index})
-        print('index = ', ind)
-        ind += 1
-        print('=========================')
-
-    df['AIC_cam_model_predict'] = best_model_AIC
-    df['BIC_cam_model_predict'] = best_model_BIC
-    df['proposal_cam_model_predict'] = best_model_proposal
-    df.to_excel(os.path.join(save_path, 'accuracy.xlsx'), index=False)
+        RMSE_BC = cali_error_process(obj_pts, img_pts, proj_model_BC, dist_model_BC, img_size)
+        RMSE_KB = cali_error_process(obj_pts, img_pts, proj_model_KB, dist_model_KB, img_size)
+        np.save(os.path.join(img_pts_path, 'rms_bc.npy'), RMSE_BC)
+        np.save(os.path.join(img_pts_path, 'rms_kb.npy'), RMSE_KB)
