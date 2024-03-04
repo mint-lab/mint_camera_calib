@@ -111,23 +111,7 @@ def add_noise(x, mean=0, standard_deviation=1):
 
     return x
 
-
-if __name__ == '__main__':
-    proj_model  = ['P0', 'P1', 'P2', 'P3']
-    dist_model = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
-    img_size = (960, 1280)
-    chessboard_pattern = (10, 7)
-    data_path = 'data/synthetic/dataset_noise_1/'
-    if not os.path.exists(data_path):
-        os.mkdir(data_path)
-
-    ind = 1
-    model_ind = []
-    synthetic_path = []
-    cam_model = []
-    K_original = []
-    dist_original = []
-    obj_pts = gen_chessboard_points(chessboard_pattern)
+def generate_img(obj_pts, proj_model, dist_model, save_path, ind):
     for intrinsic_type in proj_model:
         for dist_type in dist_model:
             for _ in range(10):
@@ -145,6 +129,33 @@ if __name__ == '__main__':
                 K_original.append(K)
                 dist_original.append(dist_coef)
                 ind += 1
+    return cam_model, K_original, dist_original, synthetic_path, model_ind
+
+if __name__ == '__main__':
+    proj_model_BC = ['P0', 'P1', 'P2', 'P3']
+    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4']
+    proj_model_KB = ['P1', 'P3']
+    dist_model_KB =['KB0', 'KB1', 'KB2']
+    img_size = (960, 1280)
+    chessboard_pattern = (10, 7)
+    data_path = 'data/synthetic/dataset_noise_1/'
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
+
+    obj_pts = gen_chessboard_points(chessboard_pattern)
+
+    ind = 0
+    cam_model_BC, K_original_BC, dist_original_BC, synthetic_path_BC, model_ind_BC = generate_img(obj_pts, proj_model_BC, dist_model_BC, data_path, ind)
+    
+    ind = model_ind_BC[-1] + 1
+    cam_model_KB, K_original_KB, dist_original_KB, synthetic_path_KB, model_ind_KB = generate_img(obj_pts, proj_model_KB, dist_model_KB, data_path, ind)
+
+    model_ind = model_ind_BC + model_ind_BC
+    synthetic_path = synthetic_path_BC + synthetic_path_BC
+    cam_model = cam_model_BC + cam_model_KB
+    K_original = K_original_BC + K_original_BC
+    dist_original = dist_original_BC + dist_original_KB
+    
     data = {'index': model_ind, 'path': synthetic_path, 'cam_model': cam_model, 'K_original': K_original, 'dist_original': dist_original}  
     df = pd.DataFrame(data)
     df.to_excel(data_path + 'synthetic_data.xlsx', index=False)
