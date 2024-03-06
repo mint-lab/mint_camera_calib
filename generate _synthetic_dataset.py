@@ -13,35 +13,28 @@ def gen_chessboard_points(chessboard_pattern, cellsize=0.025, dtype=np.float32):
     obj_pts = obj_pts.reshape(row, 1, col)
     return obj_pts
 
-def random_principal_point(img_size):
-    cx = random.randint((img_size[1] - 1) / 2 - 10, img_size[1] / 2 + 10)
-    cy = random.randint((img_size[0] - 1) / 2 - 10, img_size[0] / 2 + 10)
-
-    return cx, cy  
-
-def generate_intrinsic_maxtrix(intrinsic_type, img_size):
+def generate_intrinsic_maxtrix(intrinsic_type, f, img_size):
     if intrinsic_type == 'P0':
-        fx = fy = random.randint(800, 1000)
+        fx = fy = f
         cx = (img_size[1] - 1) / 2
         cy = (img_size[0] - 1) / 2
     elif intrinsic_type == 'P1':
-        fx = random.randint(800, 1000)
-        fy = random.randint(800, 1000)
+        fx, fy = f - 20, f 
         cx = (img_size[1] - 1) / 2
         cy = (img_size[0] - 1) / 2
     elif intrinsic_type == 'P2':
-        fx = fy = random.randint(800, 1000)
-        cx, cy = random_principal_point(img_size)
-    else:
-        fx = random.randint(800, 1000)
-        fy = random.randint(800, 1000)
-        cx, cy = random_principal_point(img_size)
-    
+        fx = fy = f
+        cx = (img_size[1]) / 2 - 10
+        cy = (img_size[0]) / 2 - 10
+    elif intrinsic_type == 'P3':
+        fx, fy = f - 20, f
+        cx = (img_size[1]) / 2 - 10
+        cy = (img_size[0]) / 2 - 10
     return np.array([[fx, 0., cx], [0., fy, cy], [0., 0., 1.]])
 
 def generate_dist_coef(dist_type):
     if dist_type.startswith('BC'):
-        tmp = np.array([-0.2, 0.1, 0.06, 0.04, 0.08])
+        tmp = np.array([-0.2, 0.1, -0.01, 0.005, 0.])
         dist = np.zeros(5)
         if dist_type == 'BC1':
             dist[0] = tmp[0]
@@ -49,24 +42,13 @@ def generate_dist_coef(dist_type):
             dist[0] = tmp[0]
             dist[1] = tmp[1]
         elif dist_type == 'BC3':
-            dist[0] = tmp[0]
-            dist[1] = tmp[1]
-            dist[4] = tmp[4]
-        elif dist_type == 'BC4':
             dist = tmp
     else:
-        tmp = np.array([-0.2, 0.1, 0.08, 0.06])
+        tmp = np.array([-0.2, 0.01, 0., 0.])
         dist = np.zeros(4)
         if dist_type == 'KB1':
             dist[0] = tmp[0]
         elif dist_type == 'KB2':
-            dist[0] = tmp[0]
-            dist[1] = tmp[1]
-        elif dist_type == 'KB3':
-            dist[0] = tmp[0]
-            dist[1] = tmp[1]
-            dist[2] = tmp[2]
-        elif dist_type == 'KB4':
             dist = tmp
     return dist
 
@@ -83,14 +65,13 @@ def save_img_pts(save_path, img_pts, ind_data):
     np.save(file_name, img_pts)
 
 def generate_img(obj_pts, K, dist_coef, dist_type, save_path):
-    cam_ori = [[-10., -10., 0.], [-10., 10, 0.], [-15., -10, 0.],
-               [-20., 10, 0.], [-25., -5, 0.], [-30., 10., 0.], 
-               [-30., -10., 0.], [-30., 5., 0.]]  # [deg] in the order of XYZ
-    
-    cam_pos = [[0.1, -0.1, -0.4], [0.1, -0.1, -0.6],
-              [0.15, -0.1, -0.5], [0.15, -0.1, -0.6],
-              [0.1, -0.15, -0.5]] # [m]
     ind = 1
+    cam_ori = [[-8., -5, 0.], [-10., -5, 0.],
+               [-10., -5., 5], [-8., -10., 5.]]
+    cam_pos = [[0.2, 0.05, -0.35], [0.2, 0.05, -0.4],
+               [0.25, 0.1, -0.45], [0.3, 0., -0.5], 
+               [0.15, 0.05, -0.5]]
+
     for i in cam_ori:
         # Calibrate the camera using OpenCV
         for j in cam_pos:
@@ -111,11 +92,18 @@ def add_noise(x, mean=0, standard_deviation=1):
 
     return x
 
-def generate_img(obj_pts, proj_model, dist_model, save_path, ind):
-    for intrinsic_type in proj_model:
-        for dist_type in dist_model:
-            for _ in range(10):
-                K = generate_intrinsic_maxtrix(intrinsic_type, img_size)
+def make_data(proj_model, dist_model, data_path, ind):
+    model_ind = []
+    synthetic_path = []
+    cam_model = [] 
+    K_original = []
+    dist_original = []
+    f_init  = [820, 840, 860, 880, 900, 920, 940, 960, 980, 1000]
+    
+    for dist_type in dist_model:  
+        for intrinsic_type in proj_model:
+            for f in f_init:
+                K = generate_intrinsic_maxtrix(intrinsic_type, f, img_size)
                 dist_coef = generate_dist_coef(dist_type)
 
                 save_path = os.path.join(data_path, 'model_' + str(ind))
@@ -125,37 +113,38 @@ def generate_img(obj_pts, proj_model, dist_model, save_path, ind):
 
                 model_ind.append(ind)
                 synthetic_path.append(save_path)
-                cam_model.append({'dist': dist_type, 'intrinsic': intrinsic_type})
+                cam_model.append({'intrinsic': intrinsic_type, 'dist': dist_type})
                 K_original.append(K)
                 dist_original.append(dist_coef)
                 ind += 1
-    return cam_model, K_original, dist_original, synthetic_path, model_ind
+    return model_ind, synthetic_path, cam_model, K_original, dist_original
 
 if __name__ == '__main__':
     proj_model_BC = ['P0', 'P1', 'P2', 'P3']
-    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4']
+    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3']
     proj_model_KB = ['P1', 'P3']
-    dist_model_KB =['KB0', 'KB1', 'KB2']
+    dist_model_KB = ['KB0', 'KB1', 'KB2']
     img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    data_path = 'data/synthetic/dataset_noise_1/'
+    data_path = 'data/synthetic_new'
     if not os.path.exists(data_path):
         os.mkdir(data_path)
 
-    obj_pts = gen_chessboard_points(chessboard_pattern)
+    obj_pts = gen_chessboard_points(chessboard_pattern, cellsize=0.035)
 
-    ind = 0
-    cam_model_BC, K_original_BC, dist_original_BC, synthetic_path_BC, model_ind_BC = generate_img(obj_pts, proj_model_BC, dist_model_BC, data_path, ind)
-    
+    # Genrate BC model
+    ind = 1
+    model_ind_BC, path_BC, cam_model_BC, K_original_BC, dist_original_BC = make_data(proj_model_BC, dist_model_BC, data_path, ind)
+
+    # Generate KB model
     ind = model_ind_BC[-1] + 1
-    cam_model_KB, K_original_KB, dist_original_KB, synthetic_path_KB, model_ind_KB = generate_img(obj_pts, proj_model_KB, dist_model_KB, data_path, ind)
-
-    model_ind = model_ind_BC + model_ind_BC
-    synthetic_path = synthetic_path_BC + synthetic_path_BC
-    cam_model = cam_model_BC + cam_model_KB
-    K_original = K_original_BC + K_original_BC
-    dist_original = dist_original_BC + dist_original_KB
+    model_ind_KB, path_KB, cam_model_KB, K_original_KB, dist_original_KB = make_data(proj_model_KB, dist_model_KB, data_path, ind)
     
-    data = {'index': model_ind, 'path': synthetic_path, 'cam_model': cam_model, 'K_original': K_original, 'dist_original': dist_original}  
+    data = {'index': model_ind_BC + model_ind_KB, 
+            'path': path_BC + path_KB, 
+            'K_original': K_original_BC + K_original_KB, 
+            'dist_original': dist_original_BC + dist_original_KB, 
+            'ori_model': cam_model_BC + cam_model_KB}
+    
     df = pd.DataFrame(data)
-    df.to_excel(data_path + 'synthetic_data.xlsx', index=False)
+    df.to_excel(os.path.join(data_path, 'synthetic_data.xlsx'), index=False)
