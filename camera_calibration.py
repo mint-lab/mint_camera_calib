@@ -61,11 +61,9 @@ def find_reproj_error(obj_points, img_points, rvecs, tvecs, K, dist_coef, dist_t
     return mean_error / len(obj_points)
 
 def train_test_error_process(obj_pts_train, img_pts_train, obj_pts_test, img_pts_test, proj_model, dist_model, img_size):
-    train_error_all = []
-    test_error_all = []
+    train_error_all, test_error_all = [], []
     for intrinsic_type in proj_model:
-        train_error = []
-        test_error = []
+        train_error, test_error = [], []
         for dist_type in dist_model:
             calibrate_flag = CalibrationFlag()
             flags = calibrate_flag.make_flag(intrinsic_type, dist_type)
@@ -90,7 +88,7 @@ class CalibrationFlag:
         self.proj_model_BC          = {}
         self.proj_model_BC['P0']    = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
         self.proj_model_BC['P1']    = cv.CALIB_FIX_PRINCIPAL_POINT
-        self.proj_model_BC['P2']    =  cv.CALIB_FIX_ASPECT_RATIO
+        self.proj_model_BC['P2']    = cv.CALIB_FIX_ASPECT_RATIO
 
         self.proj_model_KB          = {}
         self.proj_model_KB['P1']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
