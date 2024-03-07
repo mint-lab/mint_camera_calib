@@ -99,22 +99,17 @@ class CalibrationFlag:
         self.dist_model['BC0']      = cv.CALIB_FIX_K1 + cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
         self.dist_model['BC1']      = cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
         self.dist_model['BC2']      = cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
-        self.dist_model['BC3']      = cv. CALIB_ZERO_TANGENT_DIST
+        self.dist_model['BC3']      = cv.CALIB_FIX_K3
         self.dist_model['KB0']      = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
         self.dist_model['KB1']      = cv.fisheye.CALIB_FIX_K2 + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4  
         self.dist_model['KB2']      = cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
 
     def make_flag(self, intrinsic_type, dist_type):
         KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv.fisheye.CALIB_FIX_SKEW
-        BC_flag = None
 
         if dist_type.startswith('BC'):
-            if dist_type == 'BC4' and intrinsic_type == 'P3':
-                return BC_flag
-            elif intrinsic_type == 'P3':
+            if intrinsic_type == 'P3':
                 return self.dist_model[dist_type]
-            elif dist_type == 'BC4':
-                return self.proj_model_BC[intrinsic_type]
             else:
                 return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
         else:
@@ -156,6 +151,7 @@ class DataSampling:
             if i % self.board_pattern[0] == 0 or (i + 1) % self.board_pattern[0] == 0:
                 points_in_breadth.append(i)
 
+        selected_slice_test, selected_slice_train = [], []
         all_points = list(range(self.board_pattern[0] * self.board_pattern[1]))
         if sampling_type == 'extrapolar':
             selected_slice_test = list(set(points_in_length + points_in_breadth))
@@ -178,26 +174,3 @@ class DataSampling:
         selected_slice_train = [i for i in all_points if i not in selected_slice_test]
 
         return selected_slice_train, selected_slice_test
-
-
-if __name__ == '__main__':
-    img_size = (960, 1280)
-    chessboard_pattern = (10, 7)
-    save_path = 'data/synthetic'
-
-    df = pd.read_excel(os.path.join(save_path, 'synthetic_data.xlsx'))
-    img_pts_paths = df['path']
-    cam_model = df['ori_model']
-    proj_model_BC = ['P0', 'P1', 'P2', 'P3']
-    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4']
-    proj_model_KB = ['P1', 'P3']
-    dist_model_KB =['KB0', 'KB1', 'KB2']
-
-    for img_pts_path in tqdm(img_pts_paths):
-        img_pts = load_img_pts(img_pts_path)
-        obj_pts = generate_obj_points(chessboard_pattern, len(img_pts))
-        N_samples = len(obj_pts) * obj_pts[0].shape[0]
-        RMSE_BC = cali_error_process(obj_pts, img_pts, proj_model_BC, dist_model_BC, img_size)
-        RMSE_KB = cali_error_process(obj_pts, img_pts, proj_model_KB, dist_model_KB, img_size)
-        np.save(os.path.join(img_pts_path, 'rms_bc.npy'), RMSE_BC)
-        np.save(os.path.join(img_pts_path, 'rms_kb.npy'), RMSE_KB)
