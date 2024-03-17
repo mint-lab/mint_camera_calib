@@ -113,7 +113,9 @@ def plot_multi_score(df_AIC, df_BIC, df_proposal):
 if __name__ == '__main__':
     file_path = 'data/synthetic/dataset_noise_1/model_23' 
     index = ['P0', 'P1', 'P2', 'P3']
-    column = ['BC0', 'BC1', 'BC2', 'BC3', 'BC4', 'KB0', 'KB1', 'KB2', 'KB3', 'KB4']
+    dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3']
+    proj_model_KB = ['P1', 'P3']
+    dist_model_KB =['KB0', 'KB1', 'KB2']
     N_samples = 40 * 70
 
     # Load error
