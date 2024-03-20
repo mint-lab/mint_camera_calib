@@ -1,5 +1,6 @@
 from camera_calibration import *
-
+import matplotlib.pyplot as plt
+import seaborn as sn
 
 def get_num_para_BC():
     dist_model_num_para = [0, 1, 2, 4]
@@ -64,11 +65,19 @@ def find_best_model_BIC(RMSE_BC, RMSE_KB, N_samples, proj_model_BC, proj_model_K
 
     return min_BIC_intrinsic, min_BIC_dist
 
+def plot_one_score(df):
+    
+    # plt.figure(figsize=(10,7))
+    sn.set(font_scale=0.65) # for label size
+    sn.heatmap(df, annot=True, cmap='jet', square=True) # font size
+    # plt.axis('equal')
+    plt.show()
+
 
 if __name__ == '__main__':
     img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    data_path = 'data/synthetic_new'
+    data_path = 'data/synthetic_new_20'
     proj_model_BC = ['P0', 'P1', 'P2', 'P3']
     dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3']
     proj_model_KB = ['P1', 'P3']
