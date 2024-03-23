@@ -1,49 +1,38 @@
-import os
-import pandas as pd
 from camera_calibration import *
 
-path = 'data/synthetic_new_10'
-sampling_type = 'random'
+path = 'data/synthetic'
 df_ori = pd.read_excel(os.path.join(path, 'synthetic_data.xlsx'))
 df_AIC_BIC = pd.read_excel(os.path.join(path, 'AIC_BIC.xlsx'))
-df_proposal = pd.read_excel(os.path.join(path, 'poposal_' + sampling_type + '_.xlsx'))
 
-# Check accuracy for choosing the distortion model
-AIC_count = 0
-BIC_count = 0
-proposal_count = 0
+# Check accuracy for choosing the camera model
 img_pts_paths = df_ori['path']
 intrinsic_original = df_ori['K_original']
-ori_cam_model= df_ori['ori_model']
-predicted_model_AIC = df_AIC_BIC['AIC_cam_model_predict']
-predicted_model_BIC = df_AIC_BIC['BIC_cam_model_predict']
-predicted_model_proposal = df_proposal['proposal_cam_model_predict']
+ori_cam_models = df_ori['ori_model']
+AIC_predicted_models = df_AIC_BIC['AIC_cam_model_predict']
+BIC_predicted_models = df_AIC_BIC['BIC_cam_model_predict']
 
-ind = 1
-for ori_model, AIC_model, BIC_model, prosal_model in zip(ori_cam_model, predicted_model_AIC, predicted_model_BIC, predicted_model_proposal):
+AIC_count = 0
+BIC_count = 0
+for ori_model, AIC_model, BIC_model in zip(ori_cam_models, AIC_predicted_models, BIC_predicted_models):
     ori_model = eval(ori_model)
     AIC_model = eval(AIC_model)
     BIC_model = eval(BIC_model)
-    prosal_model = eval(prosal_model) 
 
-    # if ori_model['dist'] == AIC_model['dist'] and ori_model['intrinsic'] == AIC_model['intrinsic']:
-    if ori_model['dist'] == AIC_model['dist']:
+    if ori_model['dist'] == AIC_model['dist'] and ori_model['intrinsic'] == AIC_model['intrinsic']:
+    # if ori_model['dist'] == AIC_model['dist']:
         AIC_count += 1
-    # if ori_model['dist'] == BIC_model['dist'] and ori_model['intrinsic'] == BIC_model['intrinsic']:
-    if ori_model['dist'] == BIC_model['dist']:
-        BIC_count += 1
-    # if ori_model['dist'] == prosal_model['dist'] and ori_model['intrinsic'] == prosal_model['intrinsic']:
-    if ori_model['dist'] == prosal_model['dist']:
-        proposal_count += 1
 
-print(AIC_count)
-print(AIC_count / len(df_AIC_BIC) * 100)
-print('=============================')
-print(BIC_count)
-print(BIC_count / len(df_AIC_BIC) * 100)
-print('=============================')
-print(proposal_count)
-print(proposal_count / len(df_proposal) * 100)
+    if ori_model['dist'] == BIC_model['dist'] and ori_model['intrinsic'] == BIC_model['intrinsic']:
+    # if ori_model['dist'] == BIC_model['dist']:
+        BIC_count += 1
+
+print('========================================AIC Accuracy========================================')
+print('Number of correctly predicted models = {}/{}'.format(AIC_count, len(df_AIC_BIC)))
+print('Acc = {:.2f}%'.format(AIC_count / len(df_AIC_BIC) * 100))
+
+print('========================================BIC Accuracy========================================')
+print('Number of correctly predicted models = {}/{}'.format(BIC_count, len(df_AIC_BIC)))
+print('Acc = {:.2f}%'.format(BIC_count / len(df_AIC_BIC) * 100))
 
 # Check RMSE for Focal Length, Principal Point, Reprojection Error
 # chessboard_pattern = (10, 7)
