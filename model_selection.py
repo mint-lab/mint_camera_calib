@@ -60,11 +60,13 @@ def vizualize_score(df):
     # plt.axis('equal')
     plt.show()
 
+def normalize_df(df):
+    return (df - df.stack().min()) / (df.stack().max() - df.stack().min())
 
 if __name__ == '__main__':
-    img_size = (540, 960)
+    img_size = (960, 1280)
     chessboard_pattern = (10, 7)
-    data_path = 'data/real'
+    data_path = 'data/real/data_40/img'
     data_type = 'real'
     proj_model_BC = ['P0', 'P1', 'P2', 'P3']
     dist_model_BC = ['BC0', 'BC1', 'BC2', 'BC3']
@@ -109,7 +111,8 @@ if __name__ == '__main__':
     print('================================== BIC ===================================')
     print(BIC_df, '\n')
     print('============================ BSET MODEL BIC ==============================')
+    print(normalize_df(BIC_df))
     print('Projection Model = ', min_BIC_intrinsic)
     print('Distortion Model = ', min_BIC_dist)
 
-    vizualize_score (BIC_df)
+    vizualize_score (normalize_df(BIC_df))
