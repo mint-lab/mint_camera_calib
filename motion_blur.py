@@ -1,5 +1,8 @@
 import cv2 as cv
 import numpy as np
+import os
+import glob
+from scipy.spatial.distance import hamming
 
 
 def motion_blur(image, kernel_size, type):
@@ -68,3 +71,90 @@ def find_chessboard_corners(images, board_pattern):
     corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
 
     return corners
+
+def create_descriptor(img, cell_width, chessboard_pattern):
+    img_w, img_h = img.shape[1], img.shape[0]
+    conners = find_chessboard_corners(img, chessboard_pattern) 
+
+    descriptor = np.zeros(len(range(0, img_w - 1, cell_width)) * len(range(0, img_h - 1, cell_width)))
+    ind = 0
+    for i in range(0, img_h - 1, cell_width): 
+        for j in range(0, img_w - 1, cell_width):
+            top_left_pt = (j, i)
+            bottom_right_pt = (min(j + cell_width, img_w - 1), min(i + cell_width, img_h - 1))
+            for conner in conners:
+                if top_left_pt [0] < conner[0][0] < bottom_right_pt[0] and top_left_pt[1] < conner[0][1] < bottom_right_pt[1]:
+                    descriptor[ind] = 1 
+            ind += 1
+    return descriptor
+
+def random_img_select(video_file, img_path, cell_width, chessboard_pattern, select_all=False, wait_msec=10, wnd_name='Image Selection'):
+    # Open a video
+    video = cv.VideoCapture(video_file)
+    assert video.isOpened()
+
+    # Select images
+    img_select = []
+    ind = 0
+    filter_img_select = []
+    ind_filter = 1
+    
+    if not os.path.exists(img_path):
+        os.makedirs(img_path)
+    else:
+        all_files = glob.glob(os.path.join(img_path, '*.[jJpP]*[gG]'))
+        for file in all_files:
+            os.remove(file)
+
+    if not os.path.exists('random_filter'):
+        os.makedirs('random_filter')
+    else:
+        all_files = glob.glob(os.path.join('random_filter', '*.[jJpP]*[gG]'))
+        for file in all_files:
+            os.remove(file)
+
+    while True:
+        # Grab an images from the video
+        valid, img = video.read()
+        if not valid:
+            break
+
+        if select_all:
+            img_select.append(img)
+        else:
+            # Show the image
+            cv.putText(img, f'NSelect: {ind}', (10, 25), cv.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0))
+            cv.imshow(wnd_name, img)
+
+            # Process the key event
+            key = cv.waitKey(wait_msec)
+            if key == ord(' '):             # Space: Pause and show corners
+                key = cv.waitKey()
+                if key == ord('\r'):
+                    save_path = os.path.join(img_path , 'img_' + str(ind + 1) +'.jpg')
+                    cv.imwrite(save_path, img)
+                    cv.imshow(wnd_name, img)
+                    img_select.append(img) # Enter: Select the image
+                    ind += 1
+                     
+                    if len(filter_img_select) == 0:
+                        save_path = os.path.join('random_filter' , 'img_' + str(ind_filter) +'.jpg')
+                        cv.imwrite(save_path, img)
+                        filter_img_select.append(img)
+                        ind_filter += 1
+                    else:
+                        d1 = create_descriptor(img, cell_width, chessboard_pattern)
+                        d2 = create_descriptor(filter_img_select[-1], cell_width, chessboard_pattern)
+                        d = hamming(d1, d2) 
+                        print('d = ', d) 
+                        if d > 0.1:
+                            save_path = os.path.join('random_filter' , 'img_' + str(ind_filter) +'.jpg')
+                            cv.imwrite(save_path, img)
+                            filter_img_select.append(img)
+                            ind_filter += 1
+
+            if key == 27:                  # ESC: Exit (Complete image selection)
+                break
+
+    cv.destroyAllWindows()
+    return img_select
