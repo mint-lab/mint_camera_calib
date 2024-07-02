@@ -1,11 +1,23 @@
 import glob
 import os
 import random
-import pandas as pd
 import numpy as np
 import cv2 as cv
-from tqdm import tqdm
 
+
+def find_chessboard_corners(images, board_pattern):
+    # Find 2D corner points from given images
+    img_points = []
+    for img in images:
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        complete, pts = cv.findChessboardCorners(gray, board_pattern)
+        if complete:
+            criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
+            img_points.append(corners)
+    assert len(img_points) > 0
+
+    return img_points, gray.shape
 
 def generate_obj_points(board_pattern, len_img_points):
     obj_pts = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
@@ -19,6 +31,20 @@ def load_img_pts(img_pts_path):
     img_pts = [np.load(file) for file in all_files]
     return img_pts
 
+def load_img(img_pts_path):
+    # All image formats
+    image_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp', '.jp2']
+
+    # Filter all image files
+    all_files = [os.path.join(img_pts_path, file) for file in os.listdir(img_pts_path)
+                 if os.path.splitext(file)[1].lower() in image_extensions]
+
+    # Readd
+    img_pts = [cv.imread(file) for file in all_files]
+    img_name = [os.path.basename(file) for file in all_files]
+
+    return img_pts, img_name
+
 def calibrate(obj_pts, img_pts, img_size, dist_type, flags, K=None, dist_coef=None):
     if dist_type.startswith('BC'):
         return cv.calibrateCamera(obj_pts, img_pts, img_size[::-1], cameraMatrix=K, distCoeffs=dist_coef, flags=flags)
@@ -31,7 +57,7 @@ def calibrate(obj_pts, img_pts, img_size, dist_type, flags, K=None, dist_coef=No
             print(flags)
             return cv.fisheye.calibrate(obj_pts, img_pts, img_size[::-1], K=K, D=dist_coef, flags=flags)
 
-def cali_error_process(obj_pts, img_pts, proj_model, dist_model, img_size):
+def model_wise_rmse(obj_pts, img_pts, proj_model, dist_model, img_size):
     RMSEs = []
     for intrinsic_type in proj_model:
         RMSE = []
