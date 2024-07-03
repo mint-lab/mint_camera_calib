@@ -6,7 +6,7 @@ import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import cv2 as cv
-from camera_calibration import *
+from model_selection import CameraCalibration
 
 
 def normalize(array):
@@ -57,28 +57,25 @@ if __name__ == '__main__':
         visualize_model_wise(normalize_df(model_wise_df))
     elif args.type_visualization == 'point_wise_rmse':
         pattern = args.chessboard_pattern
-        imgs, img_name = load_img(results['data_path'])
-        img_pts, img_size = find_chessboard_corners(imgs, pattern)
+        imgs, img_name = CameraCalibration.load_img(results['data_path'])
+        img_pts, img_size = CameraCalibration.find_chessboard_corners(imgs, pattern)
 
-        obj_pts = generate_obj_points(pattern, len(img_pts))
+        obj_pts = CameraCalibration.generate_obj_points(pattern, len(img_pts))
         N_samples = len(obj_pts) * obj_pts[0].shape[0]
-        cam_w, cam_h = img_size[1], img_size[0]
+        # cam_w, cam_h = img_size[1], img_size[0]
 
-        dist_type = results['best_dist_model']
-        intrinsic_type1 = results['best_proj_model']
-        calibrate_flag = CalibrationFlag()
-        flags = calibrate_flag.make_flag(intrinsic_type1, dist_type)
-        rms, K, dist_coef, rvecs, tvecs = calibrate(obj_pts, img_pts, img_size, dist_type=dist_type, flags=flags)
-        error = []
+        flags = CameraCalibration.make_flag(intrinsic_type = results['best_proj_model'], dist_type = results['best_dist_model'])
+        rms, K, dist_coef, rvecs, tvecs = CameraCalibration.calibrate(obj_pts, img_pts, img_size, dist_type = results['best_dist_model'], flags=flags)
+        pt_wwise_error = []
         for i in range(len(obj_pts)):
-            reproj_img_pts = find_reproject_points(obj_pts[i], rvecs[i], tvecs[i], K, dist_coef, dist_type)
+            reproj_img_pts = CameraCalibration.find_reproject_points(obj_pts[i], rvecs[i], tvecs[i], K, dist_coef, dist_type = results['best_dist_model'])
             diff = reproj_img_pts - img_pts[i]
-            error.append(np.array([cv.norm(d, cv.NORM_L2) for d in diff]))
+            pt_wwise_error.append(np.array([cv.norm(d, cv.NORM_L2) for d in diff]))
         
-        error = np.array(error).T
+        pt_wwise_error = np.array(pt_wwise_error).T
         pt = [f'pt{i}' for i in range(1, pattern[0] * pattern[1] + 1)]
-        point_wise_rmse = pd.DataFrame(error, columns=img_name, index=pt)
+        point_wise_rmse = pd.DataFrame(pt_wwise_error, columns=img_name, index=pt)
         file_name = [file.split('.')[0] for file in img_name]
-        visualize_point_wise(error, file_name)
+        visualize_point_wise(pt_wwise_error, file_name)
         
         
