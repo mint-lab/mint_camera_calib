@@ -72,23 +72,27 @@ class CameraCalibration:
         obj_pts = [x.reshape(row, 1, col) for x in obj_pts]
         return obj_pts
     
-    def load_img(self,):
+    def load_img(self):
         # All image formats
         image_extensions = ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp', '.jp2']
 
         # Filter all image files
         all_files = [os.path.join(self.img_path, file) for file in os.listdir(self.img_path)
                     if os.path.splitext(file)[1].lower() in image_extensions]
-
-        # Readd
-        imgs = [cv.imread(file) for file in all_files]
-        img_name = [os.path.basename(file) for file in all_files]
+        sorted_files = sorted(all_files)
+        # Read
+        imgs = []
+        img_name = []
+        for file in sorted_files:
+            imgs.append(cv.imread(file))
+            img_name.append(os.path.basename(file))
 
         return imgs, img_name
     
     def load_img_pts(self):
         all_files = glob.glob(os.path.join(self.config['img_path'], 'img*.npy'))
-        img_pts = [np.load(file) for file in all_files]
+        sorted_files = sorted(all_files)
+        img_pts = [np.load(file) for file in sorted_files]
         return img_pts
     
     def find_chessboard_corners(self, imgs, board_pattern):
@@ -148,6 +152,14 @@ class CameraCalibration:
                 RMSE.append(rms)
             RMSEs.append(RMSE)
         return np.array(RMSEs)
+    
+    def find_reproject_points(self, obj_pts, rvecs, tvecs, K, dist_coef, dist_type):
+        if dist_type.startswith('KB'):
+            reproj_img_points, _ = cv.fisheye.projectPoints(obj_pts, rvecs, tvecs, K, dist_coef)
+        else:
+            reproj_img_points, _ = cv.projectPoints(obj_pts, rvecs, tvecs, K, dist_coef)
+
+        return reproj_img_points
     
     def model_wise_rmse(self):
         imgs, img_name = self.load_img()
@@ -251,8 +263,8 @@ class CameraSelection:
             'best_proj_model': min_intrinsic,
             'best_dist_model': min_dist,
             'rmse_min': min_rmse,
-            'model_wise_rmse': RMSE_df.to_dict(orient='index'),
-            'model_wise_score': model_wise_score_df.to_dict(orient='index'), 
+            'model_wise': RMSE_df.to_dict(orient='index'),
+            'model_wise': model_wise_score_df.to_dict(orient='index'), 
             'img_name': img_name
         }
         
