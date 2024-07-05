@@ -24,12 +24,13 @@ def visualize_model_wise(df):
     plt.show()
 
 def visualize_point_wise(error, img_name):
-    plt.imshow(error, cmap='jet', interpolation='nearest', aspect='auto')
+    plt.imshow(error, cmap='Oranges', interpolation='nearest', aspect='auto')
     plt.colorbar()  
-    plt.title('Point wise error')  
-    plt.xlabel('Image') 
-    plt.xticks(ticks=np.arange(0, len(img_name)), labels=img_name, rotation='vertical')
-    plt.ylabel('Point')
+    plt.title('Point-wise RMSE')  
+    plt.xlabel('Point Index') 
+    plt.xticks(ticks=np.arange(0, error.shape[1], 5))
+    plt.ylabel('Image')
+    plt.yticks(ticks=np.arange(0, error.shape[0]), labels=img_name)
     plt.tight_layout()
     plt.show()
 
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     # Add arguments thi the parser
     parser = argparse.ArgumentParser(prog='visualize', description='Visualization of model wise score or point wise rmse')
     parser.add_argument('result_file', type=str, help='specify the result file path')
-    parser.add_argument('-t', '--type_visualization', default='model_wise_socre', type=str, help='specify if user want to display model wise score or point wise rmse')
+    parser.add_argument('-t', '--type_visualization', default='model_wise', type=str, help='specify if user want to display model wise score or point wise rmse')
     parser.add_argument('-p', '--chessboard_pattern', default=(10, 7), type=tuple, help='Specify the chessboard pattern size')
 
     # Parse the command-line arguments
@@ -51,31 +52,27 @@ if __name__ == '__main__':
     with open(file_path, 'r') as json_file:
         results = json.load(json_file)
 
-    if args.type_visualization == 'model_wise_socre':
-        model_wise_df = results['model_wise_score']
+    if args.type_visualization == 'model_wise':
+        model_wise_df = results['model_wise']
         model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
         visualize_model_wise(normalize_df(model_wise_df))
-    elif args.type_visualization == 'point_wise_rmse':
+    elif args.type_visualization == 'point_wise':
         pattern = args.chessboard_pattern
-        imgs, img_name = CameraCalibration.load_img(results['data_path'])
-        img_pts, img_size = CameraCalibration.find_chessboard_corners(imgs, pattern)
+        camera_calibration = CameraCalibration(results['data_path'])
+        imgs, img_name = camera_calibration.load_img()
+        img_pts, img_size = camera_calibration.find_chessboard_corners(imgs, pattern)
+        obj_pts = camera_calibration.generate_obj_points(pattern, len(img_pts))
 
-        obj_pts = CameraCalibration.generate_obj_points(pattern, len(img_pts))
-        N_samples = len(obj_pts) * obj_pts[0].shape[0]
-        # cam_w, cam_h = img_size[1], img_size[0]
-
-        flags = CameraCalibration.make_flag(intrinsic_type = results['best_proj_model'], dist_type = results['best_dist_model'])
-        rms, K, dist_coef, rvecs, tvecs = CameraCalibration.calibrate(obj_pts, img_pts, img_size, dist_type = results['best_dist_model'], flags=flags)
+        flags = camera_calibration.make_flag(intrinsic_type = results['best_proj_model'], dist_type = results['best_dist_model'])
+        rms, K, dist_coef, rvecs, tvecs = camera_calibration.calibrate(obj_pts, img_pts, img_size, dist_type = results['best_dist_model'], flags=flags)
         pt_wwise_error = []
         for i in range(len(obj_pts)):
-            reproj_img_pts = CameraCalibration.find_reproject_points(obj_pts[i], rvecs[i], tvecs[i], K, dist_coef, dist_type = results['best_dist_model'])
+            reproj_img_pts = camera_calibration.find_reproject_points(obj_pts=obj_pts[i], rvecs=rvecs[i], tvecs=tvecs[i], K=K, dist_coef=dist_coef, dist_type=results['best_dist_model'])
             diff = reproj_img_pts - img_pts[i]
             pt_wwise_error.append(np.array([cv.norm(d, cv.NORM_L2) for d in diff]))
         
-        pt_wwise_error = np.array(pt_wwise_error).T
-        pt = [f'pt{i}' for i in range(1, pattern[0] * pattern[1] + 1)]
-        point_wise_rmse = pd.DataFrame(pt_wwise_error, columns=img_name, index=pt)
+        pt_wise_error = np.array(pt_wwise_error)
+        pts = [f'pt{i}' for i in range(1, pattern[0] * pattern[1] + 1)]
+        point_wise_rmse = pd.DataFrame(pt_wise_error, columns=pts, index=img_name)
         file_name = [file.split('.')[0] for file in img_name]
-        visualize_point_wise(pt_wwise_error, file_name)
-        
-        
+        visualize_point_wise(pt_wise_error, file_name)
