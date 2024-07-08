@@ -15,20 +15,20 @@ class CameraCalibration:
 
         # Project model for BC
         self.proj_model_BC          = {}
-        self.proj_model_BC['P0']    = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
-        self.proj_model_BC['P1']    = cv.CALIB_FIX_PRINCIPAL_POINT
-        self.proj_model_BC['P2']    = cv.CALIB_FIX_ASPECT_RATIO
+        self.proj_model_BC['P1']    = cv.CALIB_FIX_ASPECT_RATIO + cv.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_BC['P2']    = cv.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_BC['P3']    = cv.CALIB_FIX_ASPECT_RATIO
 
         # Projection model for KB
         self.proj_model_KB          = {}
-        self.proj_model_KB['P1']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
+        self.proj_model_KB['P2']    = cv.fisheye.CALIB_FIX_PRINCIPAL_POINT
     
         # Distortion model
         self.dist_model             = {}
         self.dist_model['BC0']      = cv.CALIB_FIX_K1 + cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
         self.dist_model['BC1']      = cv.CALIB_FIX_K2 + cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
         self.dist_model['BC2']      = cv.CALIB_FIX_K3  + cv.CALIB_ZERO_TANGENT_DIST
-        self.dist_model['BC3']      = cv.CALIB_FIX_K3
+        self.dist_model['BC4']      = cv.CALIB_FIX_K3
         self.dist_model['KB0']      = cv.fisheye.CALIB_FIX_K1 + cv.fisheye.CALIB_FIX_K2  + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
         self.dist_model['KB1']      = cv.fisheye.CALIB_FIX_K2 + cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4  
         self.dist_model['KB2']      = cv.fisheye.CALIB_FIX_K3 + cv.fisheye.CALIB_FIX_K4
@@ -45,25 +45,11 @@ class CameraCalibration:
     def get_default_config():
         config = {}
 
-        config['proj_model_BC'] = ['P0', 'P1', 'P2', 'P3']
-        config['dist_model_BC'] = ['BC0', 'BC1', 'BC2', 'BC3']
-        config['proj_model_KB'] = ['P1', 'P3']
+        config['proj_model_BC'] = ['P1', 'P2', 'P3', 'P4']
+        config['dist_model_BC'] = ['BC0', 'BC1', 'BC2', 'BC4']
+        config['proj_model_KB'] = ['P2', 'P4']
         config['dist_model_KB'] = ['KB0', 'KB1', 'KB2']
         return config
-
-    def make_flag(self, intrinsic_type, dist_type):
-        KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv.fisheye.CALIB_FIX_SKEW
-
-        if dist_type.startswith('BC'):
-            if intrinsic_type == 'P3':
-                return self.dist_model[dist_type]
-            else:
-                return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
-        else:
-            if intrinsic_type == 'P3':
-                return KB_flag + self.dist_model[dist_type]
-            else:
-                return KB_flag + self.proj_model_KB[intrinsic_type] + self.dist_model[dist_type]
             
     def generate_obj_pts(self, len_img_pts):
         obj_pts = [[c, r, 0] for r in range(self.config['chessboard_pattern'][1]) for c in range(self.config['chessboard_pattern'][0])]
@@ -113,12 +99,12 @@ class CameraCalibration:
         KB_flag = cv.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv.fisheye.CALIB_FIX_SKEW
 
         if dist_type.startswith('BC'):
-            if intrinsic_type == 'P3':
+            if intrinsic_type == 'P4':
                 return self.dist_model[dist_type]
             else:
                 return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
         else:
-            if intrinsic_type == 'P3':
+            if intrinsic_type == 'P4':
                 return KB_flag + self.dist_model[dist_type]
             else:
                 return KB_flag + self.proj_model_KB[intrinsic_type] + self.dist_model[dist_type]
@@ -176,7 +162,7 @@ class CameraCalibration:
         RMSE_KB_df = pd.DataFrame(RMSE_KB, index=self.config['proj_model_KB'], columns=self.config['dist_model_KB'])
         RMSE_df = pd.concat([RMSE_BC_df, RMSE_KB_df], axis=1)
 
-        return RMSE_df, num_pts_in_dataset, img_name
+        return RMSE_df.round(4), num_pts_in_dataset, img_name
 
 
 class CameraSelection:
@@ -198,23 +184,23 @@ class CameraSelection:
         config = {}
 
         config['proj_num_para'] = {}
-        config['proj_num_para']['P0'] = 1
-        config['proj_num_para']['P1'] = 2
-        config['proj_num_para']['P2'] = 3
-        config['proj_num_para']['P3'] = 4
+        config['proj_num_para']['P1'] = 1
+        config['proj_num_para']['P2'] = 2
+        config['proj_num_para']['P3'] = 3
+        config['proj_num_para']['P4'] = 4
 
         config['dist_num_para'] = {}
         config['dist_num_para']['BC0'] = 0
         config['dist_num_para']['BC1'] = 1
         config['dist_num_para']['BC2'] = 2
-        config['dist_num_para']['BC3'] = 4
+        config['dist_num_para']['BC4'] = 4
         config['dist_num_para']['KB0'] = 0
         config['dist_num_para']['KB1'] = 1
         config['dist_num_para']['KB2'] = 2
 
-        config['proj_model_BC'] = ['P0', 'P1', 'P2', 'P3']
-        config['dist_model_BC'] = ['BC0', 'BC1', 'BC2', 'BC3']
-        config['proj_model_KB'] = ['P1', 'P3']
+        config['proj_model_BC'] = ['P1', 'P2', 'P3', 'P4']
+        config['dist_model_BC'] = ['BC0', 'BC1', 'BC2', 'BC4']
+        config['proj_model_KB'] = ['P2', 'P4']
         config['dist_model_KB'] = ['KB0', 'KB1', 'KB2']
 
         return config
@@ -234,7 +220,7 @@ class CameraSelection:
                 RMSE = RMSE_df.at[proj_model, dist_model]
                 score_df.at[proj_model,dist_model] = self.apply_criteria(RMSE, N_samples, dist_model, proj_model)
 
-        return score_df
+        return score_df.round(4)
 
     def find_df_min_value(self, df):
         min_value = df.stack().min()
