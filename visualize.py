@@ -14,7 +14,7 @@ def normalize(array):
     max_val = np.max(array)
     array = (array - min_val) / (max_val - min_val)
 
-    return array
+    return np.round(array, 4)
 
 def visualize_model_wise(df):
     # plt.figure(figsize=(10,7))
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         results = json.load(json_file)
 
     if args.type_visualization == 'model_wise':
-        model_wise_df = results['model_wise']
+        model_wise_df = results['model_wise_score']
         model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
         visualize_model_wise(normalize_df(model_wise_df))
     elif args.type_visualization == 'point_wise':
