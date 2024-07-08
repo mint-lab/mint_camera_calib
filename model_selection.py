@@ -249,8 +249,8 @@ class CameraSelection:
             'best_proj_model': min_intrinsic,
             'best_dist_model': min_dist,
             'rmse_min': min_rmse,
-            'model_wise': RMSE_df.to_dict(orient='index'),
-            'model_wise': model_wise_score_df.to_dict(orient='index'), 
+            'model_wise_rms': RMSE_df.to_dict(orient='index'),
+            'model_wise_score': model_wise_score_df.to_dict(orient='index'), 
             'img_name': img_name
         }
         
