@@ -8,7 +8,7 @@ import pandas as pd
 
 
 class CameraCalibration:
-    def __init__(self, img_path, config_file='cfgs/cam_calibration.json') -> None:
+    def __init__(self, img_path, config_file='cfgs/cam_cali_select.json') -> None:
         self.img_path = img_path
         self.config_file = config_file
         self.config = self.get_default_config()
@@ -50,13 +50,14 @@ class CameraCalibration:
         config['proj_model_KB'] = ['P2', 'P4']
         config['dist_model_KB'] = ['KB0', 'KB1', 'KB2']
         return config
-            
-    def generate_obj_pts(self, len_img_pts):
-        obj_pts = [[c, r, 0] for r in range(self.config['chessboard_pattern'][1]) for c in range(self.config['chessboard_pattern'][0])]
-        obj_pts = [np.array(obj_pts, dtype=np.float32)] * len_img_pts # Must be 'np.float32'
+    
+    def generate_obj_pts(self, board_pattern, img_pts):
+
+        obj_pts = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
+        obj_pts = [np.array(obj_pts, dtype=np.float32)] * len(img_pts)  # Must be 'np.float32'
         row, col = obj_pts[0].shape
-        obj_pts = [x.reshape(row, 1, col) for x in obj_pts]
-        return obj_pts
+
+        return [x.reshape(row, 1, col) for x in obj_pts]
     
     def load_img(self):
         # All image formats
@@ -69,14 +70,13 @@ class CameraCalibration:
         # Read
         imgs = []
         img_name = []
-        for file in sorted_files:
-            imgs.append(cv.imread(file))
-            img_name.append(os.path.basename(file))
+        imgs = [cv.imread(file) for file in sorted_files]
+        img_name = [os.path.basename(file) for file in sorted_files]
 
         return imgs, img_name
     
     def load_img_pts(self):
-        all_files = glob.glob(os.path.join(self.config['img_path'], 'img*.npy'))
+        all_files = glob.glob(os.path.join(self.img_path, 'img*.npy'))
         sorted_files = sorted(all_files)
         img_pts = [np.load(file) for file in sorted_files]
         return img_pts
@@ -91,7 +91,8 @@ class CameraCalibration:
                 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
                 corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
                 img_points.append(corners)
-        assert len(img_points) > 0
+        if not img_points:
+            raise ValueError("No chessboard corners found in any of the images.")
 
         return img_points, gray.shape
 
@@ -102,20 +103,13 @@ class CameraCalibration:
             if intrinsic_type == 'P4':
                 return self.dist_model[dist_type]
             else:
-                return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type] 
+                return self.proj_model_BC[intrinsic_type] + self.dist_model[dist_type]
         else:
             if intrinsic_type == 'P4':
                 return KB_flag + self.dist_model[dist_type]
             else:
                 return KB_flag + self.proj_model_KB[intrinsic_type] + self.dist_model[dist_type]
 
-    def generate_obj_points(self, board_pattern, len_img_points):
-        obj_pts = [[c, r, 0] for r in range(board_pattern[1]) for c in range(board_pattern[0])]
-        obj_points = [np.array(obj_pts, dtype=np.float32)] * len_img_points # Must be 'np.float32'
-        row, col = obj_points[0].shape
-        obj_points = [x.reshape(row, 1, col) for x in obj_points]
-        return obj_points
-    
     def calibrate(self, obj_pts, img_pts, img_size, dist_type, flags, K=None, dist_coef=None):
         if dist_type.startswith('BC'):
             return cv.calibrateCamera(obj_pts, img_pts, img_size[::-1], cameraMatrix=K, distCoeffs=dist_coef, flags=flags)
@@ -151,7 +145,7 @@ class CameraCalibration:
         imgs, img_name = self.load_img()
         img_pts, img_size = self.find_chessboard_corners(imgs, self.config['chessboard_pattern'])
 
-        obj_pts = self.generate_obj_points(self.config['chessboard_pattern'], len(img_pts))
+        obj_pts = self.generate_obj_pts(self.config['chessboard_pattern'], img_pts)
         num_pts_in_dataset = len(obj_pts) * obj_pts[0].shape[0]
 
         # Calibration
@@ -162,11 +156,11 @@ class CameraCalibration:
         RMSE_KB_df = pd.DataFrame(RMSE_KB, index=self.config['proj_model_KB'], columns=self.config['dist_model_KB'])
         RMSE_df = pd.concat([RMSE_BC_df, RMSE_KB_df], axis=1)
 
-        return RMSE_df.round(4), num_pts_in_dataset, img_name
+        return RMSE_df, num_pts_in_dataset, img_name
 
 
 class CameraSelection:
-    def __init__(self, img_path, save_path, config_file='cfgs/cam_calibration.json') -> None:
+    def __init__(self, img_path, save_path, config_file='cfgs/cam_cali_select.json') -> None:
         self.img_path = img_path
         self.save_path = save_path
         self.config_file = config_file
@@ -220,7 +214,7 @@ class CameraSelection:
                 RMSE = RMSE_df.at[proj_model, dist_model]
                 score_df.at[proj_model,dist_model] = self.apply_criteria(RMSE, N_samples, dist_model, proj_model)
 
-        return score_df.round(4)
+        return score_df
 
     def find_df_min_value(self, df):
         min_value = df.stack().min()
@@ -228,29 +222,27 @@ class CameraSelection:
 
         return min_value, min_index, min_column
 
-    def run_selection(self, RMSE_df, N_samples):
-        model_wise_score_df = self.score_models(RMSE_df, N_samples)
-        rmse_min, min_intrinsic, min_dist = self.find_df_min_value(model_wise_score_df)
-        
-        return model_wise_score_df, rmse_min, min_intrinsic, min_dist
+    def run_selection(self, RMSE_df):
+        min_value, min_intrinsic, min_dist = self.find_df_min_value(RMSE_df)        
+        return min_value, min_intrinsic, min_dist
     
-    def save_results(self, RMSE_df, model_wise_score_df, min_intrinsic, min_dist, min_rmse, img_name):
+    def save_results(self, RMSE_df, score_df, min_rms, rms_min_intrinsic, rms_min_dist, score_min_intrinsic, score_min_dist, img_name):
         print('================================== Model wise  RMSE==================================')
         print(RMSE_df, '\n')
         print('================================== Model wise Score ===================================')
-        print(model_wise_score_df, '\n')
-        print('============================ BEST MODEL BIC ==============================')
-        print('Projection Model = ', min_intrinsic)
-        print('Distortion Model = ', min_dist)
-        print('min_rmse = ', min_rmse)
+        print(score_df, '\n')
+        print(f"============================ BEST MODEL {self.config['criteria']} ==============================")
+        print('Projection Model = ', score_min_intrinsic)
+        print('Distortion Model = ', score_min_dist)
+        print('min_rmse = ', min_rms)
 
         results = {
             'data_path': self.img_path,
-            'best_proj_model': min_intrinsic,
-            'best_dist_model': min_dist,
-            'rmse_min': min_rmse,
+            'score_best_model':{'proj_model': score_min_intrinsic, 'dist_model': score_min_dist},
+            'rms_best_model':{'proj_model': rms_min_intrinsic, 'dist_model': rms_min_dist},
+            'rms_min': min_rms,
             'model_wise_rms': RMSE_df.to_dict(orient='index'),
-            'model_wise_score': model_wise_score_df.to_dict(orient='index'), 
+            'model_wise_score': score_df.to_dict(orient='index'), 
             'img_name': img_name
         }
         
@@ -262,13 +254,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='model selection', description='Camera model calibration and selection')
     parser.add_argument('img_file', type=str, help='specify the image file path')
     parser.add_argument('save_file', type=str, help='specify the file path to save the result')
-    parser.add_argument('-c', '--config_file', default='cfgs/cam_calibration.json', type=str, help='specify a còniguration file')
+    parser.add_argument('-c', '--config_file', default='cfgs/cam_calibration.json', type=str, help='specify a configuration file')
 
     # Parse the command-line arguments
     args = parser.parse_args()
 
+    # Camera calibration
     cam_model_calibration = CameraCalibration(args.img_file, args.config_file)
     RMSE_df, num_pts_in_dataset, img_name = cam_model_calibration.model_wise_rmse()
+
+    # Camera model selection
     camera_model_selection = CameraSelection(args.img_file, args.save_file, args.config_file)
-    model_wise_score_df, min_rmse, min_intrinsic, min_dist = camera_model_selection.run_selection(RMSE_df, num_pts_in_dataset)
-    camera_model_selection.save_results(RMSE_df, model_wise_score_df, min_intrinsic, min_dist, min_rmse, img_name)
+    score_df = camera_model_selection.score_models(RMSE_df, num_pts_in_dataset)
+
+    min_rms, rms_min_intrinsic, rms_min_dist = camera_model_selection.run_selection(RMSE_df)
+    _, score_min_intrinsic, score_min_dist = camera_model_selection.run_selection(score_df)
+
+    # Save the selection results
+    camera_model_selection.save_results(RMSE_df, score_df, min_rms, rms_min_intrinsic, rms_min_dist, score_min_intrinsic, score_min_dist, img_name)
