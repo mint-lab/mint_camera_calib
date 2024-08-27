@@ -82,7 +82,19 @@ class CameraCalibration:
         return img_pts
     
     def find_chessboard_corners(self, imgs, board_pattern):
-    # Find 2D corner points from given images
+        """
+            Finds the 2D corner points of a chessboard pattern in the provided images.
+            
+            Args:
+                imgs (list): List of images in which to find the chessboard corners.
+                board_pattern (tuple): Number of internal corners per chessboard row and column.
+                
+            Returns:
+                tuple: A tuple containing the list of found image points and the image shape.
+                
+            Raises:
+            ValueError: If no chessboard corners are found in any of the images.
+        """
         img_points = []
         for img in imgs:
             gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -220,30 +232,42 @@ class CameraSelection:
         min_value = df.stack().min()
         min_index, min_column = df.stack().idxmin()
 
-        return min_value, min_index, min_column
+        camera_calibration = CameraCalibration(self.img_path)
+        imgs, img_name = camera_calibration.load_img()
+        img_pts, img_size = camera_calibration.find_chessboard_corners(imgs, self.config['chessboard_pattern'])
+        obj_pts = camera_calibration.generate_obj_pts(self.config['chessboard_pattern'], img_pts)
 
-    def run_selection(self, RMSE_df):
-        min_value, min_intrinsic, min_dist = self.find_df_min_value(RMSE_df)        
-        return min_value, min_intrinsic, min_dist
-    
-    def save_results(self, RMSE_df, score_df, min_rms, rms_min_intrinsic, rms_min_dist, score_min_intrinsic, score_min_dist, img_name):
-        print('================================== Model wise  RMSE==================================')
+        flags = camera_calibration.make_cali_flag(intrinsic_type=min_index, dist_type=min_column)
+        rms, K, dist_coef, rvecs, tvecs = cam_model_calibration.calibrate(obj_pts, img_pts, img_size,  dist_type=min_column, flags=flags)
+
+        return min_value, rms, min_index, min_column, K, dist_coef, rvecs, tvecs
+
+    def run_selection(self, RMSE_df, num_pts_in_dataset):
+        score_df = self.score_models(RMSE_df, num_pts_in_dataset)
+        min_score, rms, score_min_intrinsic, score_min_dist, K, dist_coef, rvecs, tvecs = self.find_df_min_value(score_df)       
+
+        print('================================== Model wise RMSE=====================================')
         print(RMSE_df, '\n')
         print('================================== Model wise Score ===================================')
         print(score_df, '\n')
         print(f"============================ BEST MODEL {self.config['criteria']} ==============================")
         print('Projection Model = ', score_min_intrinsic)
         print('Distortion Model = ', score_min_dist)
-        print('min_rmse = ', min_rms)
+        print('RMSE selected model = ', rms)
+        print('Best score = ', min_score)
 
         results = {
             'data_path': self.img_path,
             'score_best_model':{'proj_model': score_min_intrinsic, 'dist_model': score_min_dist},
-            'rms_best_model':{'proj_model': rms_min_intrinsic, 'dist_model': rms_min_dist},
-            'rms_min': min_rms,
+            'rms': rms,
+            'min_score': min_score,
             'model_wise_rms': RMSE_df.to_dict(orient='index'),
             'model_wise_score': score_df.to_dict(orient='index'), 
-            'img_name': img_name
+            'img_name': img_name, 
+            'K': K.tolist(),
+            'dist_coef': dist_coef.tolist(),
+            'rvecs': [rvec.tolist() for rvec in rvecs],
+            'tvecs': [tvec.tolist() for tvec in tvecs]
         }
         
         with open(self.save_path, 'w') as json_file:
@@ -254,7 +278,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='model selection', description='Camera model calibration and selection')
     parser.add_argument('img_file', type=str, help='specify the image file path')
     parser.add_argument('save_file', type=str, help='specify the file path to save the result')
-    parser.add_argument('-c', '--config_file', default='cfgs/cam_calibration.json', type=str, help='specify a configuration file')
+    parser.add_argument('-c', '--config_file', default='cfgs/cam_cali_select.json', type=str, help='specify a configuration file')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -265,10 +289,6 @@ if __name__ == '__main__':
 
     # Camera model selection
     camera_model_selection = CameraSelection(args.img_file, args.save_file, args.config_file)
-    score_df = camera_model_selection.score_models(RMSE_df, num_pts_in_dataset)
 
-    min_rms, rms_min_intrinsic, rms_min_dist = camera_model_selection.run_selection(RMSE_df)
-    _, score_min_intrinsic, score_min_dist = camera_model_selection.run_selection(score_df)
-
-    # Save the selection results
-    camera_model_selection.save_results(RMSE_df, score_df, min_rms, rms_min_intrinsic, rms_min_dist, score_min_intrinsic, score_min_dist, img_name)
+    # min_rms, rms_min_intrinsic, rms_min_dist = camera_model_selection.run_selection(RMSE_df)
+    camera_model_selection.run_selection(RMSE_df, num_pts_in_dataset)
