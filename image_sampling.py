@@ -28,7 +28,7 @@ class ImageSampling:
         config['cell_size'] = 30
         config['resolution_levels'] = [2, 3, 4]
         config['chessboard_pattern'] = (10, 7)
-        config['dist_threshold'] = 0.12
+        config['distance_threshold'] = 0.12
         config['blur_threshold'] = 80
         config['multi_score_threshold'] = 1000
 
@@ -80,7 +80,19 @@ class ImageSampling:
         
         return blur_score
 
-    def multi_resolution_score(self, descriptor):
+    def find_chessboard_corners(self, img):
+        # Find 2D corner points from given images
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        complete, pts = cv.findChessboardCorners(gray, self.config['chessboard_pattern'])
+
+        corners = None
+        if complete:
+            criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            corners = cv.cornerSubPix(gray, pts, (11, 11), (-1, -1), criteria)
+
+        return corners
+
+    def multi_resolution_score(self, descriptor, resolution_level):
         """
         Calculates a multi-resolution score for an image descriptor.
 
@@ -91,7 +103,33 @@ class ImageSampling:
         Returns:
             float: A score calculated as the sum of the descriptor multiplied by a scaling factor based on the resolution level.
         """
-        return sum(descriptor) * (2 ** self.config['resolution_levels'])
+        return sum(descriptor) * (2 ** resolution_level)
+
+    def multi_resolution_descriptor(self, img, resolution_level=None, cell_size=None):
+        corners = self.find_chessboard_corners(img) 
+        if corners is None:
+            raise ValueError("Can not find corners")
+        
+        img_w, img_h = img.shape[1], img.shape[0]
+        if resolution_level is not None:
+            cell_width = img_w//(2**resolution_level)
+            cell_height = img_h//(2**resolution_level)
+        elif cell_size is not None:
+            cell_height = cell_size
+            cell_width = cell_size
+
+        descriptor = np.zeros(len(range(0, img_w - 1, cell_width)) * len(range(0, img_h - 1, cell_height)))
+        ind = 0
+        for i in range(0, img_h - 1, cell_height): 
+            for j in range(0, img_w - 1, cell_width):
+                top_left_pt = (j, i)
+                bottom_right_pt = (min(j + cell_width, img_w - 1), min(i + cell_height, img_h - 1))
+                for conner in corners:
+                    if top_left_pt [0] < conner[0][0] < bottom_right_pt[0] and top_left_pt[1] < conner[0][1] < bottom_right_pt[1]:
+                        descriptor[ind] = 1 
+                ind += 1
+
+        return descriptor
 
     def run_img_sampling(self):
         """
@@ -145,19 +183,19 @@ class ImageSampling:
                             image_save_path = os.path.join(self.output_dir, f'img_{selected_image_count}.jpg')
                             cv.imwrite(image_save_path, frame)
                             selected_images.append(frame)
-                            all_descriptors.append(self.multi_resolution_descriptor(frame, self.config['chessboard_pattern'], cell_size=self.config['cell_size']))
+                            all_descriptors.append(self.multi_resolution_descriptor(frame, cell_size=self.config['cell_size']))
                         else:
                             # Calculate hamming distances between current frame descriptor and all previous descriptors
-                            new_frame_descriptor = self.multi_resolution_descriptor(frame, self.config['chessboard_pattern'], cell_size=self.config['cell_size'])
+                            new_frame_descriptor = self.multi_resolution_descriptor(frame, cell_size=self.config['cell_size'])
                             hamming_distances = [round(hamming(new_frame_descriptor, descriptor), 2) for descriptor in all_descriptors]
-                            print('==========================All Distances==========================')
-                            print(hamming_distances)
+                            # print('==========================All Distances==========================')
+                            # print(hamming_distances)
 
                             # Calculate multi-resolution score for the new frame
-                            new_frame_multi_descriptors = [self.multi_resolution_descriptor(frame, self.config['chessboard_pattern'], resolution_level=resolution_level) for resolution_level in self.config['resolution_levels']]
+                            new_frame_multi_descriptors = [self.multi_resolution_descriptor(frame, resolution_level=resolution_level) for resolution_level in self.config['resolution_levels']]
                             multi_resolution_score_total = sum(self.multi_resolution_score(descriptor, resolution_level) for descriptor, resolution_level in zip(new_frame_multi_descriptors, self.config['resolution_levels']))
-                            print('===========================All Scores============================')
-                            print(multi_resolution_score_total)
+                            # print('===========================All Scores============================')
+                            # print(multi_resolution_score_total)
 
                             # Select the image if it meets the distance and score thresholds
                             if all(distance > self.config['distance_threshold'] for distance in hamming_distances) and multi_resolution_score_total > self.config['multi_score_threshold']:
@@ -173,15 +211,14 @@ class ImageSampling:
         cv.destroyAllWindows()
         return selected_images
 
+
 if __name__ == '__main__':
     # Add arguments
-    # parser = argparse.ArgumentParser(prog='image_sampling', description='Image sampling from video')
-    # parser.add_argument('video_path', type=str, help='specify the video file path')
-    # parser.add_argument('out_dir', type=str, help='specify the output dir to save images')
-    # parser.add_argument('-c', '--config_file', default='cfgs/img_sampling.json')
+    parser = argparse.ArgumentParser(prog='image_sampling', description='Image sampling from video')
+    parser.add_argument('video_path', type=str, help='specify the video file path')
+    parser.add_argument('out_dir', type=str, help='specify the output dir to save images')
+    parser.add_argument('-c', '--config_file', default='cfgs/img_sampling.json')
 
-    # args = parser.parse_args()
-    # print(args)
-    args = argparse.Namespace(video_path='data/video/chessboard.avi', out_dir='data/quy', config_file='cfgs/img_sampling.json')
+    args = parser.parse_args()
     img_selection = ImageSampling(args.video_path, args.out_dir)
     img_selection.run_img_sampling()
