@@ -187,7 +187,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='visualize', description='Visualization of model wise score or point wise rmse')
     parser.add_argument('result_file', type=str, help='specify the result file path')
     parser.add_argument('-t', '--type_visualization', default='model_wise_score', type=str, help='specify if user want to display model wise score or point wise rmse')
-    parser.add_argument('-c', '--config_file', default='cfgs/cam_cali_select.json', type=str, help='specify a configuration file')
+    parser.add_argument('-c', '--config_file', default='cfgs/config.json', type=str, help='specify a configuration file')
 
     # Parse the command-line arguments
     args = parser.parse_args()
