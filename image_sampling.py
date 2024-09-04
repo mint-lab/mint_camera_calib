@@ -9,7 +9,7 @@ import argparse
 
 
 class ImageSampling:
-    def __init__(self, video_path, output_dir, config_file='cfgs/img_sampling.json') -> None:
+    def __init__(self, video_path, output_dir, config_file='cfgs/config.json') -> None:
         self.video_path = video_path
         self.output_dir = output_dir
         self.config_file = config_file
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='image_sampling', description='Image sampling from video')
     parser.add_argument('video_path', type=str, help='specify the video file path')
     parser.add_argument('out_dir', type=str, help='specify the output dir to save images')
-    parser.add_argument('-c', '--config_file', default='cfgs/img_sampling.json')
+    parser.add_argument('-c', '--config_file', default='cfgs/config.json')
 
     args = parser.parse_args()
     img_selection = ImageSampling(args.video_path, args.out_dir)
