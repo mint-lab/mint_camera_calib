@@ -52,10 +52,10 @@ class Visualization():
         luminance = self.calculate_luminance(color)
         return 'black' if luminance > 0.5 else 'white'
 
-    def visualize_model_wise(self, df, model_wise_cmap, decimal_place):
+    def visualize_model_wise(self, df, decimal_place):
         sns.set(font_scale=0.85)  # for label size
         
-        cmap = sns.color_palette(model_wise_cmap, as_cmap=True)
+        cmap = sns.color_palette(self.config['model_wise_cmap'], as_cmap=True)
         # Create a heatmap with values capped at 1 for the colormap
         ax = sns.heatmap(df, annot=True, cmap=cmap, square=True, cbar=True, 
                         vmin=0, vmax=1, cbar_kws={"fraction": 0.027}, fmt=decimal_place)
@@ -77,14 +77,15 @@ class Visualization():
         
         plt.show()
 
-    def visualize_point_wise(self, error, img_name):
-        plt.imshow(error, cmap='Oranges', interpolation='nearest', aspect='auto')
+    def visualize_point_wise(self, error, img_names):
+        img_ind = [img_name.split('_')[-1] for img_name in img_names]
+        plt.imshow(error, self.config['point_wise_cmap'], interpolation='nearest', aspect='auto')
         plt.colorbar()  
         plt.title('Point-wise RMSE')  
         plt.xlabel('Point Index') 
         plt.xticks(ticks=np.arange(0, error.shape[1], 5))
-        plt.ylabel('Image')
-        plt.yticks(ticks=np.arange(0, error.shape[0]), labels=img_name)
+        plt.ylabel('Image Index')
+        plt.yticks(ticks=np.arange(0, error.shape[0]), labels=img_ind)
         plt.tight_layout()
         plt.show()
 
@@ -138,44 +139,47 @@ class Visualization():
         plt.show()
 
     def run_visualize(self):
-        with open(self.result_path, 'r') as f:
-            results = json.load(f)
+        try:
+            with open(self.result_path, 'r') as f:
+                results = json.load(f)
 
-        if self.visual_type == 'model_wise_score':
-            model_wise_df = results['model_wise_score']
-            model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
-            self.visualize_model_wise(self.normalize_df(model_wise_df), model_wise_cmap=self.config['model_wise_cmap'], decimal_place=self.config['decimal_place'])
-        elif self.visual_type == 'model_wise_rms':
-            model_wise_df = results['model_wise_rms']
-            model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
-            self.visualize_model_wise(model_wise_df, model_wise_cmap=self.config['model_wise_cmap'], decimal_place=self.config['decimal_place'])
-        elif self.visual_type == 'point_wise':
-            camera_calibration = CameraCalibration(results['data_path'])
-            imgs, img_name = camera_calibration.load_img()
-            img_pts, img_size = camera_calibration.find_chessboard_corners(imgs, self.config['chessboard_pattern'])
-            obj_pts = camera_calibration.generate_obj_pts(self.config['chessboard_pattern'], img_pts)
-            K = np.array(results["K"])
-            dist_coef = np.array(results["dist_coef"])
-            rvecs = tuple(np.array(rv) for rv in results["rvecs"])
-            tvecs = tuple(np.array(rv) for rv in results["tvecs"])
+            if self.visual_type == 'model_wise_score':
+                model_wise_df = results['model_wise_score']
+                model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
+                self.visualize_model_wise(self.normalize_df(model_wise_df), decimal_place=self.config['decimal_place'])
+            elif self.visual_type == 'model_wise_rms':
+                model_wise_df = results['model_wise_rms']
+                model_wise_df = pd.DataFrame.from_dict(model_wise_df, orient='index')
+                self.visualize_model_wise(model_wise_df, decimal_place=self.config['decimal_place'])
+            elif self.visual_type == 'point_wise':
+                camera_calibration = CameraCalibration(results['data_path'])
+                imgs, img_name = camera_calibration.load_img()
+                img_pts, img_size = camera_calibration.find_chessboard_corners(imgs, self.config['chessboard_pattern'])
+                obj_pts = camera_calibration.generate_obj_pts(self.config['chessboard_pattern'], img_pts)
+                K = np.array(results["K"])
+                dist_coef = np.array(results["dist_coef"])
+                rvecs = tuple(np.array(rv) for rv in results["rvecs"])
+                tvecs = tuple(np.array(rv) for rv in results["tvecs"])
 
-            pt_wwise_error = []
-            for i in range(len(obj_pts)):
-                reproj_img_pts = camera_calibration.find_reproject_points(obj_pts=obj_pts[i], rvecs=rvecs[i], tvecs=tvecs[i], K=K, dist_coef=dist_coef, dist_type=results['score_best_model']['dist_model'])
-                diff = reproj_img_pts - img_pts[i]
-                pt_wwise_error.append(np.array([cv.norm(d, cv.NORM_L2) for d in diff]))
-            
-            pt_wise_error = np.array(pt_wwise_error)
-            pts = [f'pt{i}' for i in range(1, self.config['chessboard_pattern'][0] *  self.config['chessboard_pattern'][1] + 1)]
-            # point_wise_rmse = pd.DataFrame(pt_wise_error, columns=pts, index=img_name)
-            file_name = [file.split('.')[0] for file in results['img_name']]
-            self.visualize_point_wise(pt_wise_error, file_name)
-        elif self.visual_type == 'cam_pose':
-            rvecs = tuple(np.array(rv) for rv in results["rvecs"])
-            tvecs = tuple(np.array(rv) for rv in results["tvecs"])
-            obj_pt = np.zeros((self.config['chessboard_pattern'][0] * self.config['chessboard_pattern'][1], 3), np.float32)
-            obj_pt[:, :2] = np.mgrid[0:self.config['chessboard_pattern'][0], 0:self.config['chessboard_pattern'][1]].T.reshape(-1, 2)
-            self.visualize_cam_pose(obj_pt, rvecs, tvecs)
+                pt_wwise_error = []
+                for i in range(len(obj_pts)):
+                    reproj_img_pts = camera_calibration.find_reproject_points(obj_pts=obj_pts[i], rvecs=rvecs[i], tvecs=tvecs[i], K=K, dist_coef=dist_coef, dist_type=results['score_best_model']['dist_model'])
+                    diff = reproj_img_pts - img_pts[i]
+                    pt_wwise_error.append(np.array([cv.norm(d, cv.NORM_L2) for d in diff]))
+                
+                pt_wise_error = np.array(pt_wwise_error)
+                pts = [f'pt{i}' for i in range(1, self.config['chessboard_pattern'][0] *  self.config['chessboard_pattern'][1] + 1)]
+                # point_wise_rmse = pd.DataFrame(pt_wise_error, columns=pts, index=img_name)
+                file_name = [file.split('.')[0] for file in results['img_name']]
+                self.visualize_point_wise(pt_wise_error, file_name)
+            elif self.visual_type == 'cam_pose':
+                rvecs = tuple(np.array(rv) for rv in results["rvecs"])
+                tvecs = tuple(np.array(rv) for rv in results["tvecs"])
+                obj_pt = np.zeros((self.config['chessboard_pattern'][0] * self.config['chessboard_pattern'][1], 3), np.float32)
+                obj_pt[:, :2] = np.mgrid[0:self.config['chessboard_pattern'][0], 0:self.config['chessboard_pattern'][1]].T.reshape(-1, 2)
+                self.visualize_cam_pose(obj_pt, rvecs, tvecs)
+        except:
+            print('can not find the result file. Check file name or perform calibration and model selection before visualization!!!')
 
 
 if __name__ == '__main__':
