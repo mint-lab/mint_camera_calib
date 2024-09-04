@@ -8,7 +8,7 @@ import pandas as pd
 
 
 class CameraCalibration:
-    def __init__(self, img_path, config_file='cfgs/cam_cali_select.json') -> None:
+    def __init__(self, img_path, config_file='cfgs/config.json') -> None:
         self.img_path = img_path
         self.config_file = config_file
         self.config = self.get_default_config()
@@ -172,7 +172,7 @@ class CameraCalibration:
 
 
 class CameraSelection:
-    def __init__(self, img_path, save_path, config_file='cfgs/cam_cali_select.json') -> None:
+    def __init__(self, img_path, save_path, config_file='cfgs/config.json') -> None:
         self.img_path = img_path
         self.save_path = save_path
         self.config_file = config_file
