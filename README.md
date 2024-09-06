@@ -64,7 +64,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         scores in heatmaps after applying selection criteria, or `model_wise_rms`, which displays RMSE values for each model post-calibration.
   
         <p align="center">
-          <img width="400" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/model_wise_score.png" alt="Model Wise Score" />
+          <img width="50%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/model_wise_score.png" alt="Model Wise Score" />
           <br />
           <i>Figure 2. An example of model_wise_score.</i>
         </p>      
@@ -73,7 +73,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
          Identify and address images with large reprojection errors, providing insights for enhancing overall calibration accuracy.
  
         <p align='center'>
-          <img width="400px" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/point_wise.png" />
+          <img width="45%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/point_wise.png" />
           <br />
           <i>Figure 3. An example of `model_wise_score`.</i>
         </p>
