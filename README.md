@@ -75,7 +75,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         <p align='center'>
           <img width="45%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/point_wise.png" />
           <br />
-          <i>Figure 3. An example of `model_wise_score`.</i>
+          <i>Figure 3. An example of model_wise_score.</i>
         </p>
   
       * `cam_pose`:
