@@ -83,7 +83,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         camera placement, ensuring a more diverse and well-distributed array of shots. This enhances the dataset by providing a richer variety of perspectives
         and improving overall coverage..
  
-        An example of cam_pose accompanied by a visual comparison of dataset construction using random sampling versus our proposed image sampling method:
+        An example of `cam_pose` accompanied by a visual comparison of dataset construction using random sampling versus our proposed image sampling method:
  
         <p align="center">
             <img src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/random_dataset_cam_pose.png" width="35%" alt="Random dataset" />
