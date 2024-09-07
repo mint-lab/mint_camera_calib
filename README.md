@@ -23,7 +23,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
 
 * **_Camera Calibration:_**
 
-  Propose 22 different camera models by combining different projection and distortion models, and perform comprehensive
+  Propose 22 different camera models by combining various projection and distortion models, and perform comprehensive
   calibration for each to ensure optimal accuracy across a range of configurations.
   
 * **_Model Selection:_**
@@ -80,8 +80,8 @@ and strategically selecting the most optimal viewpoints for capturing the next i
   
       * `cam_pose`:
         Camera Position Visualization reveals the location of each camera used in image capture within a dataset. It offers valuable insights for optimizing 
-        camera placement, ensuring a more diverse and well-distributed array of shots. This enhances the dataset by providing a richer variety of perspectives
-        and improving overall coverage..
+        camera placement, ensuring a more diverse and well-distributed array of shots. This enhances the dataset by providing a wider variety of perspectives
+        and improving overall coverage.
  
         An example of `cam_pose` accompanied by a visual comparison of dataset construction using random sampling versus our proposed image sampling method:
  
