@@ -75,7 +75,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         <p align='center'>
           <img width="45%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/point_wise.png" />
           <br />
-          <i>Figure 3. An example of point-wise visualization.</i>
+          <i>An example of point-wise visualization.</i>
         </p>
   
       * `cam_pose`:
@@ -89,7 +89,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
             <img src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/random_dataset_cam_pose.png" width="35%" alt="Random dataset" />
             <img src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/our_dataset_cam_pose.png" width="35%" alt="Our method dataset" />
             <br>
-            <i>Figure 4. (a): Random dataset (left). (b): Our method dataset (right).</i>
+            <i>(a): Random dataset (left). (b): Our method dataset (right).</i>
         </p>
 
 
