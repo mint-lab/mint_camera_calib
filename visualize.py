@@ -77,16 +77,70 @@ class Visualization():
         
         plt.show()
 
-    def visualize_point_wise(self, error, img_names):
+    def visualize_point_wise(self, error, img_names, square_cell=True):
+        # Extract the image index from image names by splitting the names by '_'
+        # and taking the last part (assumed to be a numeric identifier).
         img_ind = [img_name.split('_')[-1] for img_name in img_names]
-        plt.imshow(error, self.config['point_wise_cmap'], interpolation='nearest', aspect='auto')
-        plt.colorbar()  
-        plt.title('Point-wise RMSE')  
-        plt.xlabel('Point Index') 
-        plt.xticks(ticks=np.arange(0, error.shape[1], 5))
-        plt.ylabel('Image Index')
-        plt.yticks(ticks=np.arange(0, error.shape[0]), labels=img_ind)
+
+        # Create a dictionary mapping the image indices to the corresponding error values.
+        ind2error_dict = dict(zip(img_ind, error))
+        
+        # Sort the image indices and use them to reorder the error values.
+        sorted_img_ind = sorted(ind2error_dict.keys(), key=int)
+        sorted_error = [ind2error_dict[key] for key in sorted_img_ind]
+
+        # If square_cell is False, plot without ensuring that each cell is square.
+        if not square_cell:
+            # Plot the error matrix as a heatmap with automatic aspect ratio adjustment.
+            plt.imshow(error, self.config['point_wise_cmap'], interpolation='nearest', aspect='auto')
+            
+            # Add a colorbar to visualize the error value scale.
+            plt.colorbar()  
+            
+            # Add a title and labels for the x and y axes.
+            plt.title('Point-wise RMSE')  
+            plt.xlabel('Point Index') 
+            
+            # Set the ticks for the x-axis, spacing every 5 points.
+            plt.xticks(ticks=np.arange(0, error.shape[1], 5))
+            plt.ylabel('Image Index')
+            
+            # Set the y-axis ticks and labels to the image indices.
+            plt.yticks(ticks=np.arange(0, error.shape[0]), labels=img_ind) 
+        
+        # If square_cell is True, ensure each cell in the heatmap is a square.
+        else:
+            # Create a figure and axis, adjusting the figure size to 10x6.
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # Plot the sorted error matrix with an 'equal' aspect ratio to ensure square cells.
+            cax = ax.imshow(np.array(sorted_error), cmap=self.config['point_wise_cmap'], interpolation='nearest', aspect='equal')
+
+            # Add a colorbar with a slight reduction in size (shrink=0.9) and position adjustments.
+            cbar = fig.colorbar(cax, ax=ax, orientation='vertical', fraction=0.0135, pad=0.04, shrink=0.9)
+            
+            # Set a common font size for axis labels and ticks.
+            font_size = 14
+
+            # Label the x-axis and y-axis with appropriate font size.
+            ax.set_xlabel('Point Index', fontsize=font_size)
+            ax.set_ylabel('Image Index', fontsize=font_size)
+            
+            # Set the y-ticks to be based on the sorted image indices and adjust the font size.
+            ax.set_yticks(np.arange(0, len(sorted_img_ind)))
+            ax.set_yticklabels(sorted_img_ind, fontsize=font_size)
+            
+            # Increase the font size for x and y tick labels.
+            ax.tick_params(axis='x', labelsize=font_size)
+            ax.tick_params(axis='y', labelsize=font_size)
+            
+            # Adjust the colorbar's tick label font size to match the axis labels.
+            cbar.ax.tick_params(labelsize=font_size)
+
+        # Automatically adjust the layout to ensure that everything fits within the figure.
         plt.tight_layout()
+        
+        # Display the plot.
         plt.show()
 
     def visualize_cam_pose(self, obj_pt, rvecs, tvecs):
