@@ -13,7 +13,7 @@ as shown in the figure below:
 <p align='center'>
   <img width="800px" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/pipeline.png" />
   <br/>
-  <i> Figure 1. Generalized Camera Calibration Framework.</i>
+  <i> Generalized Camera Calibration Framework.</i>
 </p>
 
 * **_Image Sampling:_**
@@ -23,7 +23,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
 
 * **_Camera Calibration:_**
 
-  Propose 22 different camera models by combining different projection and distortion models, and perform comprehensive
+  Propose 22 different camera models by combining various projection and distortion models, and perform comprehensive
   calibration for each to ensure optimal accuracy across a range of configurations.
   
 * **_Model Selection:_**
@@ -66,7 +66,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         <p align="center">
           <img width="50%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/model_wise_score.png" alt="Model Wise Score" />
           <br />
-          <i>Figure 2. An example of model-wise visualization using model_wise_score.</i>
+          <i>An example of model-wise visualization using model_wise_score.</i>
         </p>      
   
       * `point_wise`:
@@ -75,13 +75,13 @@ and strategically selecting the most optimal viewpoints for capturing the next i
         <p align='center'>
           <img width="45%" src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/point_wise.png" />
           <br />
-          <i>Figure 3. An example of point-wise visualization.</i>
+          <i>An example of point-wise visualization.</i>
         </p>
   
       * `cam_pose`:
         Camera Position Visualization reveals the location of each camera used in image capture within a dataset. It offers valuable insights for optimizing 
-        camera placement, ensuring a more diverse and well-distributed array of shots. This enhances the dataset by providing a richer variety of perspectives
-        and improving overall coverage..
+        camera placement, ensuring a more diverse and well-distributed array of shots. This enhances the dataset by providing a wider variety of perspectives
+        and improving overall coverage.
  
         An example of `cam_pose` accompanied by a visual comparison of dataset construction using random sampling versus our proposed image sampling method:
  
@@ -89,7 +89,7 @@ and strategically selecting the most optimal viewpoints for capturing the next i
             <img src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/random_dataset_cam_pose.png" width="35%" alt="Random dataset" />
             <img src="https://github.com/mint-lab/mint_camera_calib/blob/main/docs/our_dataset_cam_pose.png" width="35%" alt="Our method dataset" />
             <br>
-            <i>Figure 4. (a): Random dataset (left). (b): Our method dataset (right).</i>
+            <i>(a): Random dataset (left). (b): Our method dataset (right).</i>
         </p>
 
 
